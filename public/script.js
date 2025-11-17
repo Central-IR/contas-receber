@@ -1,9 +1,9 @@
 // ============================================
-// CONFIGURAÇÃO
+// CONFIGURACAO
 // ============================================
 const PORTAL_URL = 'https://ir-comercio-portal-zcan.onrender.com';
 const API_URL = 'https://contas-receber-kkf9.onrender.com/api';
-const FRETE_API_URL = 'https://controle-frete.onrender.com/api';';
+const FRETE_API_URL = 'https://controle-frete.onrender.com/api';
 
 let contas = [];
 let isOnline = false;
@@ -13,7 +13,7 @@ let currentMonth = new Date().getMonth();
 let currentYear = new Date().getFullYear();
 
 const meses = [
-    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Janeiro', 'Fevereiro', 'Mar?o', 'Abril', 'Maio', 'Junho',
     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
 ];
 
@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ============================================
-// NAVEGAÇÃO POR MESES
+// NAVEGA??O POR MESES
 // ============================================
 function updateMonthDisplay() {
     const display = document.getElementById('currentMonthDisplay');
@@ -58,7 +58,7 @@ window.nextMonth = function() {
 };
 
 // ============================================
-// AUTENTICAÇÃO
+// AUTENTICA??O
 // ============================================
 function verificarAutenticacao() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -80,11 +80,11 @@ function verificarAutenticacao() {
     inicializarApp();
 }
 
-function mostrarTelaAcessoNegado(mensagem = 'NÃO AUTORIZADO') {
+function mostrarTelaAcessoNegado(mensagem = 'N?O AUTORIZADO') {
     document.body.innerHTML = `
         <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: var(--bg-primary); color: var(--text-primary); text-align: center; padding: 2rem;">
             <h1 style="font-size: 2.2rem; margin-bottom: 1rem;">${mensagem}</h1>
-            <p style="color: var(--text-secondary); margin-bottom: 2rem;">Somente usuários autenticados podem acessar esta área.</p>
+            <p style="color: var(--text-secondary); margin-bottom: 2rem;">Somente usu?rios autenticados podem acessar esta ?rea.</p>
             <a href="${PORTAL_URL}" style="display: inline-block; background: var(--btn-register); color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600;">Ir para o Portal</a>
         </div>
     `;
@@ -100,13 +100,10 @@ function inicializarApp() {
 }
 
 // ============================================
-// SINCRONIZAÇÃO CORRIGIDA - CONTAS A RECEBER
+// SINCRONIZA??O COM CONTROLE DE FRETE
 // ============================================
-
 async function sincronizarNotasEntregues() {
     if (!isOnline) return;
-
-    console.log('🔄 Iniciando sincronização...');
 
     try {
         const response = await fetch(`${FRETE_API_URL}/fretes`, {
@@ -118,34 +115,20 @@ async function sincronizarNotasEntregues() {
             mode: 'cors'
         });
 
-        if (!response.ok) {
-            console.log('⚠️ Erro ao buscar fretes:', response.status);
-            return;
-        }
+        if (!response.ok) return;
 
         const fretes = await response.json();
-        console.log(`📦 ${fretes.length} fretes encontrados`);
-        
-        // Buscar fretes com status ENTREGUE OU campo entregue=true
-        const notasEntregues = fretes.filter(f => {
-            return f.status === 'ENTREGUE' || f.entregue === true;
-        });
-
-        console.log(`✅ ${notasEntregues.length} fretes entregues encontrados`);
+        const notasEntregues = fretes.filter(f => f.entregue === true);
 
         for (const frete of notasEntregues) {
-            console.log(`📋 Verificando frete NF: ${frete.numero_nf}`);
-            
             const jaExiste = contas.find(c => c.numero_nf === frete.numero_nf);
             
             if (!jaExiste) {
-                console.log(`➕ Criando conta para NF: ${frete.numero_nf}`);
-                
                 const novaConta = {
                     numero_nf: frete.numero_nf,
-                    valor_nota: frete.valor_nf, // ✅ CORRIGIDO: valor_nf (não valor_nota)
-                    orgao: frete.orgao || frete.nome_orgao, // ✅ Tentar ambos os campos
-                    vendedor: frete.vendedor_responsavel || frete.vendedor, // ✅ Tentar ambos os campos
+                    valor_nota: frete.valor_nota,
+                    orgao: frete.orgao,
+                    vendedor: frete.vendedor_responsavel,
                     data_emissao: frete.data_emissao,
                     valor_pago: 0,
                     data_pagamento: null,
@@ -153,21 +136,17 @@ async function sincronizarNotasEntregues() {
                     status: 'PENDENTE',
                     dados_frete: {
                         transportadora: frete.transportadora,
-                        rastreio: frete.rastreio || frete.numero_nf, // Usar NF como rastreio se não tiver
-                        data_entrega: frete.data_entrega_realizada || frete.previsao_entrega
+                        rastreio: frete.rastreio,
+                        data_entrega: frete.data_entrega_realizada || frete.data_entrega
                     }
                 };
 
-                console.log('📤 Dados a enviar:', novaConta);
-
                 await criarContaAutomatica(novaConta);
-            } else {
-                console.log(`⏭️ Conta já existe para NF: ${frete.numero_nf}`);
             }
         }
 
     } catch (error) {
-        console.error('❌ Erro na sincronização:', error);
+        console.error('Erro ao sincronizar notas:', error);
     }
 }
 
@@ -187,24 +166,18 @@ async function criarContaAutomatica(contaData) {
         if (response.ok) {
             const novaConta = await response.json();
             contas.push(novaConta);
-            console.log(`✅ Nota ${contaData.numero_nf} importada automaticamente`);
+            console.log(`Nota ${contaData.numero_nf} importada automaticamente`);
             updateAllFilters();
             updateDashboard();
             filterContas();
-            
-            // Mostrar notificação visual
-            showMessage(`Nota ${contaData.numero_nf} importada automaticamente!`, 'success');
-        } else {
-            const errorData = await response.json();
-            console.error('❌ Erro ao criar conta:', errorData);
         }
     } catch (error) {
-        console.error('❌ Erro ao criar conta automática:', error);
+        console.error('Erro ao criar conta autom?tica:', error);
     }
 }
 
 // ============================================
-// CONEXÃO E STATUS
+// CONEX?O E STATUS
 // ============================================
 async function checkServerStatus() {
     try {
@@ -219,7 +192,7 @@ async function checkServerStatus() {
 
         if (response.status === 401) {
             sessionStorage.removeItem('contasReceberSession');
-            mostrarTelaAcessoNegado('Sua sessão expirou');
+            mostrarTelaAcessoNegado('Sua sess?o expirou');
             return false;
         }
 
@@ -265,7 +238,7 @@ async function loadContas() {
 
         if (response.status === 401) {
             sessionStorage.removeItem('contasReceberSession');
-            mostrarTelaAcessoNegado('Sua sessão expirou');
+            mostrarTelaAcessoNegado('Sua sess?o expirou');
             return;
         }
 
@@ -351,11 +324,11 @@ function updateDashboard() {
 }
 
 // ============================================
-// MODAL DE CONFIRMAÇÃO
+// MODAL DE CONFIRMA??O
 // ============================================
 function showConfirm(message, options = {}) {
     return new Promise((resolve) => {
-        const { title = 'Confirmação', confirmText = 'Confirmar', cancelText = 'Cancelar', type = 'warning' } = options;
+        const { title = 'Confirma??o', confirmText = 'Confirmar', cancelText = 'Cancelar', type = 'warning' } = options;
 
         const modalHTML = `
             <div class="modal-overlay" id="confirmModal" style="z-index: 10001;">
@@ -412,9 +385,9 @@ function showPagamentoModal(conta) {
                 
                 <div class="info-section" style="margin-bottom: 1.5rem;">
                     <p><strong>NF:</strong> ${conta.numero_nf}</p>
-                    <p><strong>Órgão:</strong> ${conta.orgao}</p>
+                    <p><strong>?rg?o:</strong> ${conta.orgao}</p>
                     <p><strong>Valor da Nota:</strong> R$ ${parseFloat(conta.valor_nota).toFixed(2)}</p>
-                    <p><strong>Já Pago:</strong> R$ ${parseFloat(conta.valor_pago || 0).toFixed(2)}</p>
+                    <p><strong>J? Pago:</strong> R$ ${parseFloat(conta.valor_pago || 0).toFixed(2)}</p>
                     <p><strong>Restante:</strong> <span style="color: var(--danger-color); font-weight: bold;">R$ ${valorRestante.toFixed(2)}</span></p>
                 </div>
 
@@ -429,9 +402,9 @@ function showPagamentoModal(conta) {
                             <select id="banco_pagamento" required>
                                 <option value="">Selecione...</option>
                                 <option value="BANCO DO BRASIL">Banco do Brasil</option>
-                                <option value="CAIXA">Caixa Econômica</option>
+                                <option value="CAIXA">Caixa Econ?mica</option>
                                 <option value="BRADESCO">Bradesco</option>
-                                <option value="ITAU">Itaú</option>
+                                <option value="ITAU">Ita?</option>
                                 <option value="SANTANDER">Santander</option>
                                 <option value="SICOOB">Sicoob</option>
                             </select>
@@ -468,7 +441,7 @@ async function handlePagamento(event, contaId) {
     const conta = contas.find(c => String(c.id) === idStr);
 
     if (!conta) {
-        showMessage('Conta não encontrada!', 'error');
+        showMessage('Conta n?o encontrada!', 'error');
         return;
     }
 
@@ -483,7 +456,7 @@ async function handlePagamento(event, contaId) {
     const dataAtual = new Date().toISOString().split('T')[0];
 
     if (!isOnline) {
-        showMessage('Sistema offline. Dados não foram salvos.', 'error');
+        showMessage('Sistema offline. Dados n?o foram salvos.', 'error');
         closePagamentoModal();
         return;
     }
@@ -579,14 +552,14 @@ window.togglePago = async function(id) {
 };
 
 // ============================================
-// VISUALIZAÇÃO
+// VISUALIZA??O
 // ============================================
 window.viewConta = function(id) {
     const idStr = String(id);
     const conta = contas.find(c => String(c.id) === idStr);
     
     if (!conta) {
-        showMessage('Conta não encontrada!', 'error');
+        showMessage('Conta n?o encontrada!', 'error');
         return;
     }
 
@@ -606,23 +579,23 @@ window.viewConta = function(id) {
 
                     <div class="tab-content active" id="view-tab-nota">
                         <div class="info-section">
-                            <h4>Informações da Nota Fiscal</h4>
-                            <p><strong>Número NF:</strong> ${conta.numero_nf}</p>
+                            <h4>Informa??es da Nota Fiscal</h4>
+                            <p><strong>N?mero NF:</strong> ${conta.numero_nf}</p>
                             <p><strong>Valor da Nota:</strong> R$ ${parseFloat(conta.valor_nota).toFixed(2)}</p>
-                            <p><strong>Órgão:</strong> ${conta.orgao}</p>
+                            <p><strong>?rg?o:</strong> ${conta.orgao}</p>
                             <p><strong>Vendedor:</strong> ${conta.vendedor}</p>
-                            <p><strong>Data Emissão:</strong> ${formatDate(conta.data_emissao)}</p>
+                            <p><strong>Data Emiss?o:</strong> ${formatDate(conta.data_emissao)}</p>
                             <p><strong>Status:</strong> ${getStatusBadge(getStatusDinamico(conta))}</p>
                         </div>
                     </div>
 
                     <div class="tab-content" id="view-tab-pagamento">
                         <div class="info-section">
-                            <h4>Informações de Pagamento</h4>
+                            <h4>Informa??es de Pagamento</h4>
                             <p><strong>Valor Pago:</strong> R$ ${parseFloat(conta.valor_pago || 0).toFixed(2)}</p>
                             <p><strong>Valor Restante:</strong> R$ ${(parseFloat(conta.valor_nota) - parseFloat(conta.valor_pago || 0)).toFixed(2)}</p>
-                            ${conta.banco ? `<p><strong>Banco:</strong> ${conta.banco}</p>` : '<p><em>Banco não informado</em></p>'}
-                            ${conta.data_pagamento ? `<p><strong>Data do Pagamento:</strong> ${formatDate(conta.data_pagamento)}</p>` : '<p><em>Ainda não pago</em></p>'}
+                            ${conta.banco ? `<p><strong>Banco:</strong> ${conta.banco}</p>` : '<p><em>Banco n?o informado</em></p>'}
+                            ${conta.data_pagamento ? `<p><strong>Data do Pagamento:</strong> ${formatDate(conta.data_pagamento)}</p>` : '<p><em>Ainda n?o pago</em></p>'}
                         </div>
                     </div>
 
@@ -633,7 +606,7 @@ window.viewConta = function(id) {
                                 <p><strong>Transportadora:</strong> ${conta.dados_frete.transportadora || '-'}</p>
                                 <p><strong>Rastreio:</strong> ${conta.dados_frete.rastreio || '-'}</p>
                                 <p><strong>Data Entrega:</strong> ${formatDate(conta.dados_frete.data_entrega) || '-'}</p>
-                            ` : '<p><em>Dados de frete não disponíveis</em></p>'}
+                            ` : '<p><em>Dados de frete n?o dispon?veis</em></p>'}
                         </div>
                     </div>
                 </div>
@@ -771,7 +744,7 @@ function filterContas() {
 }
 
 // ============================================
-// RENDERIZAÇÃO
+// RENDERIZA??O
 // ============================================
 function renderContas(contasToRender) {
     const container = document.getElementById('contasContainer');
@@ -789,17 +762,17 @@ function renderContas(contasToRender) {
                 <thead>
                     <tr>
                         <th style="width: 40px; text-align: center;">
-                            <span style="font-size: 1.1rem;">✓</span>
+                            <span style="font-size: 1.1rem;">?</span>
                         </th>
                         <th>NF</th>
                         <th>Valor Nota</th>
-                        <th>Órgão</th>
+                        <th>?rg?o</th>
                         <th>Vendedor</th>
                         <th>Valor Pago</th>
                         <th>Data Pgto</th>
                         <th>Banco</th>
                         <th>Status</th>
-                        <th style="text-align: center;">Ações</th>
+                        <th style="text-align: center;">A??es</th>
                     </tr>
                 </thead>
                 <tbody>
