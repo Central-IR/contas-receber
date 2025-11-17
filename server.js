@@ -1,10 +1,9 @@
 // ============================================
-// CONTAS A RECEBER - SERVER.JS (CORRIGIDO)
+// CONTAS A RECEBER - SERVER.JS (SUPABASE)
 // ============================================
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { Pool } = require('pg');
 const fetch = require('node-fetch');
 const path = require('path');
 
@@ -16,40 +15,31 @@ const PORT = process.env.PORT || 10000;
 // ============================================
 const { createClient } = require('@supabase/supabase-js');
 
+console.log('═══════════════════════════════════════════');
+console.log('🔍 VERIFICANDO VARIÁVEIS DE AMBIENTE');
+console.log('═══════════════════════════════════════════');
+console.log('PORT:', process.env.PORT || '10000 (default)');
+console.log('NODE_ENV:', process.env.NODE_ENV || 'development');
+console.log('SUPABASE_URL:', process.env.SUPABASE_URL ? '✅ Configurada' : '❌ FALTANDO');
+console.log('SUPABASE_SERVICE_ROLE_KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY ? '✅ Configurada' : '❌ FALTANDO');
+console.log('FRETE_API_URL:', process.env.FRETE_API_URL || 'https://controle-frete.onrender.com (default)');
+console.log('═══════════════════════════════════════════\n');
+
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('❌ ERRO CRÍTICO: Variáveis do Supabase não configuradas!');
+    console.error('Configure SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no Render.');
+    process.exit(1);
+}
+
 const supabase = createClient(
     process.env.SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-console.log('✅ Cliente Supabase inicializado');
+console.log('✅ Cliente Supabase inicializado com sucesso!\n');
 
 // ============================================
-// POSTGRESQL POOL
-// ============================================
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: {
-        rejectUnauthorized: false
-    },
-    max: 20,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
-});
-
-console.log('✅ Pool PostgreSQL inicializado');
-
-// Testar conexão
-pool.connect((err, client, release) => {
-    if (err) {
-        console.error('❌ Erro ao conectar ao banco:', err.stack);
-    } else {
-        console.log('✅ Conexão com PostgreSQL estabelecida');
-        release();
-    }
-});
-
-// ============================================
-// MIDDLEWARES (ORDEM CORRETA!)
+// MIDDLEWARES
 // ============================================
 app.use(cors({
     origin: [
@@ -69,10 +59,10 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Servir arquivos estáticos ANTES das rotas da API
+// Servir arquivos estáticos
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Log de requisições para debug
+// Log de requisições
 app.use((req, res, next) => {
     console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
     next();
@@ -115,31 +105,35 @@ async function sincronizarNotasEntregues(sessionToken) {
         const notasEntregues = fretes.filter(f => f.entregue === true);
 
         for (const frete of notasEntregues) {
-            const existe = await pool.query(
-                'SELECT id FROM contas_receber WHERE numero_nf = $1',
-                [frete.numero_nf]
-            );
+            // Verificar se já existe
+            const { data: existe, error: erroExiste } = await supabase
+                .from('contas_receber')
+                .select('id')
+                .eq('numero_nf', frete.numero_nf)
+                .single();
 
-            if (existe.rows.length === 0) {
-                await pool.query(
-                    `INSERT INTO contas_receber 
-                    (numero_nf, valor_nota, orgao, vendedor, data_emissao, dados_frete, status) 
-                    VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-                    [
-                        frete.numero_nf,
-                        frete.valor_nota,
-                        frete.orgao,
-                        frete.vendedor_responsavel,
-                        frete.data_emissao,
-                        JSON.stringify({
+            if (!existe && !erroExiste) {
+                // Inserir nova conta
+                const { error: erroInsert } = await supabase
+                    .from('contas_receber')
+                    .insert({
+                        numero_nf: frete.numero_nf,
+                        valor_nota: frete.valor_nota,
+                        orgao: frete.orgao,
+                        vendedor: frete.vendedor_responsavel,
+                        data_emissao: frete.data_emissao,
+                        valor_pago: 0,
+                        status: 'PENDENTE',
+                        dados_frete: {
                             transportadora: frete.transportadora,
                             rastreio: frete.rastreio,
                             data_entrega: frete.data_entrega_realizada || frete.data_entrega
-                        }),
-                        'PENDENTE'
-                    ]
-                );
-                console.log(`✅ Nota ${frete.numero_nf} importada automaticamente`);
+                        }
+                    });
+
+                if (!erroInsert) {
+                    console.log(`✅ Nota ${frete.numero_nf} importada automaticamente`);
+                }
             }
         }
     } catch (error) {
@@ -151,25 +145,35 @@ async function sincronizarNotasEntregues(sessionToken) {
 // ROTAS DA API
 // ============================================
 
-// Health check ANTES de outras rotas
+// Health check
 app.get('/health', (req, res) => {
     res.json({ 
         status: 'OK', 
         service: 'Contas a Receber', 
         timestamp: new Date().toISOString(),
-        env: process.env.NODE_ENV || 'development'
+        env: process.env.NODE_ENV || 'development',
+        database: 'Supabase'
     });
 });
 
 // GET - Listar todas as contas
 app.get('/api/contas', verificarToken, async (req, res) => {
     try {
+        // Sincronizar antes de listar
         await sincronizarNotasEntregues(req.headers['x-session-token']);
         
-        const result = await pool.query(
-            'SELECT * FROM contas_receber ORDER BY data_emissao DESC'
-        );
-        res.json(result.rows);
+        const { data, error } = await supabase
+            .from('contas_receber')
+            .select('*')
+            .order('data_emissao', { ascending: false });
+
+        if (error) {
+            console.error('❌ Erro Supabase:', error);
+            return res.status(500).json({ error: 'Erro ao listar contas', details: error.message });
+        }
+
+        console.log(`✅ ${data.length} contas carregadas`);
+        res.json(data);
     } catch (error) {
         console.error('❌ Erro ao listar contas:', error);
         res.status(500).json({ error: 'Erro ao listar contas', details: error.message });
@@ -180,16 +184,18 @@ app.get('/api/contas', verificarToken, async (req, res) => {
 app.get('/api/contas/:id', verificarToken, async (req, res) => {
     try {
         const { id } = req.params;
-        const result = await pool.query(
-            'SELECT * FROM contas_receber WHERE id = $1',
-            [id]
-        );
         
-        if (result.rows.length === 0) {
+        const { data, error } = await supabase
+            .from('contas_receber')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (error) {
             return res.status(404).json({ error: 'Conta não encontrada' });
         }
-        
-        res.json(result.rows[0]);
+
+        res.json(data);
     } catch (error) {
         console.error('❌ Erro ao buscar conta:', error);
         res.status(500).json({ error: 'Erro ao buscar conta', details: error.message });
@@ -216,27 +222,30 @@ app.post('/api/contas', verificarToken, async (req, res) => {
             return res.status(400).json({ error: 'Campos obrigatórios faltando' });
         }
 
-        const result = await pool.query(
-            `INSERT INTO contas_receber 
-            (numero_nf, valor_nota, orgao, vendedor, data_emissao, valor_pago, data_pagamento, banco, status, dados_frete) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
-            RETURNING *`,
-            [
-                numero_nf, 
-                valor_nota, 
-                orgao, 
-                vendedor, 
-                data_emissao, 
-                valor_pago || 0, 
-                data_pagamento, 
-                banco, 
-                status || 'PENDENTE', 
-                dados_frete ? JSON.stringify(dados_frete) : null
-            ]
-        );
+        const { data, error } = await supabase
+            .from('contas_receber')
+            .insert({
+                numero_nf,
+                valor_nota,
+                orgao,
+                vendedor,
+                data_emissao,
+                valor_pago: valor_pago || 0,
+                data_pagamento,
+                banco,
+                status: status || 'PENDENTE',
+                dados_frete
+            })
+            .select()
+            .single();
+
+        if (error) {
+            console.error('❌ Erro Supabase:', error);
+            return res.status(500).json({ error: 'Erro ao criar conta', details: error.message });
+        }
 
         console.log(`✅ Conta criada: ${numero_nf}`);
-        res.status(201).json(result.rows[0]);
+        res.status(201).json(data);
     } catch (error) {
         console.error('❌ Erro ao criar conta:', error);
         res.status(500).json({ error: 'Erro ao criar conta', details: error.message });
@@ -249,20 +258,25 @@ app.patch('/api/contas/:id', verificarToken, async (req, res) => {
         const { id } = req.params;
         const { valor_pago, banco, data_pagamento, status } = req.body;
 
-        const result = await pool.query(
-            `UPDATE contas_receber 
-            SET valor_pago = $1, banco = $2, data_pagamento = $3, status = $4, updated_at = NOW()
-            WHERE id = $5 
-            RETURNING *`,
-            [valor_pago, banco, data_pagamento, status, id]
-        );
+        const { data, error } = await supabase
+            .from('contas_receber')
+            .update({
+                valor_pago,
+                banco,
+                data_pagamento,
+                status
+            })
+            .eq('id', id)
+            .select()
+            .single();
 
-        if (result.rows.length === 0) {
+        if (error) {
+            console.error('❌ Erro Supabase:', error);
             return res.status(404).json({ error: 'Conta não encontrada' });
         }
 
         console.log(`✅ Pagamento registrado para conta ${id}`);
-        res.json(result.rows[0]);
+        res.json(data);
     } catch (error) {
         console.error('❌ Erro ao registrar pagamento:', error);
         res.status(500).json({ error: 'Erro ao registrar pagamento', details: error.message });
@@ -274,17 +288,19 @@ app.delete('/api/contas/:id', verificarToken, async (req, res) => {
     try {
         const { id } = req.params;
         
-        const result = await pool.query(
-            'DELETE FROM contas_receber WHERE id = $1 RETURNING *',
-            [id]
-        );
+        const { data, error } = await supabase
+            .from('contas_receber')
+            .delete()
+            .eq('id', id)
+            .select()
+            .single();
 
-        if (result.rows.length === 0) {
+        if (error) {
             return res.status(404).json({ error: 'Conta não encontrada' });
         }
 
         console.log(`✅ Conta excluída: ${id}`);
-        res.json({ message: 'Conta excluída com sucesso', conta: result.rows[0] });
+        res.json({ message: 'Conta excluída com sucesso', conta: data });
     } catch (error) {
         console.error('❌ Erro ao excluir conta:', error);
         res.status(500).json({ error: 'Erro ao excluir conta', details: error.message });
@@ -303,13 +319,15 @@ app.post('/api/sincronizar', verificarToken, async (req, res) => {
 });
 
 // ============================================
-// ROTA RAIZ - Deve vir POR ÚLTIMO!
+// ROTAS DO FRONTEND
 // ============================================
+
+// Rota raiz
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Rota catch-all para SPA (ÚLTIMA ROTA!)
+// Rota catch-all para SPA
 app.get('*', (req, res) => {
     if (!req.path.startsWith('/api/')) {
         res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -338,6 +356,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
     console.log('═══════════════════════════════════════════');
     console.log(`🌐 Porta: ${PORT}`);
     console.log(`📦 Ambiente: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🗄️ Banco: Supabase`);
     console.log(`🔗 URL: http://localhost:${PORT}`);
     console.log('═══════════════════════════════════════════');
 });
@@ -347,10 +366,7 @@ process.on('SIGTERM', () => {
     console.log('⚠️ SIGTERM recebido, fechando servidor...');
     server.close(() => {
         console.log('✅ Servidor fechado');
-        pool.end(() => {
-            console.log('✅ Pool PostgreSQL fechado');
-            process.exit(0);
-        });
+        process.exit(0);
     });
 });
 
@@ -358,10 +374,7 @@ process.on('SIGINT', () => {
     console.log('⚠️ SIGINT recebido, fechando servidor...');
     server.close(() => {
         console.log('✅ Servidor fechado');
-        pool.end(() => {
-            console.log('✅ Pool PostgreSQL fechado');
-            process.exit(0);
-        });
+        process.exit(0);
     });
 });
 
