@@ -1,58 +1,56 @@
 // ============================================
-// CONTAS A RECEBER - SERVER.JS
+// CONTAS A RECEBER - SERVER.JS (CORRIGIDO)
 // ============================================
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 const fetch = require('node-fetch');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
 // ============================================
-// BANCO DE DADOS
+// SUPABASE CLIENT
 // ============================================
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-});
+const { createClient } = require('@supabase/supabase-js');
 
-// Criar tabela se não existir
-pool.query(`
-    CREATE TABLE IF NOT EXISTS contas_receber (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        numero_nf VARCHAR(50) UNIQUE NOT NULL,
-        valor_nota DECIMAL(10,2) NOT NULL,
-        orgao TEXT NOT NULL,
-        vendedor VARCHAR(100) NOT NULL,
-        data_emissao DATE NOT NULL,
-        valor_pago DECIMAL(10,2) DEFAULT 0,
-        data_pagamento DATE,
-        banco VARCHAR(100),
-        status VARCHAR(20) DEFAULT 'PENDENTE' CHECK (status IN ('PAGO', 'VENCIDO', 'PENDENTE')),
-        dados_frete JSONB,
-        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-`).then(() => console.log('✅ Tabela contas_receber verificada'))
-  .catch(err => console.error('❌ Erro ao criar tabela:', err));
+const supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
+console.log('✅ Cliente Supabase inicializado');
 
 // ============================================
-// MIDDLEWARES
+// MIDDLEWARES (ORDEM CORRETA!)
 // ============================================
 app.use(cors({
     origin: [
         'https://ir-comercio-portal-zcan.onrender.com',
         'https://contas-receber.onrender.com',
+        'https://contas-receber-kkf9.onrender.com', // ADICIONE ESTA LINHA!
         'https://controle-frete-m4gi.onrender.com',
         'http://localhost:3000',
         'http://localhost:10000'
     ],
-    credentials: true
+    credentials: true,
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'X-Session-Token', 'Accept']
 }));
 
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.urlencoded({ extended: true }));
+
+// Servir arquivos estáticos ANTES das rotas da API
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Log de requisições para debug
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+    next();
+});
 
 // Middleware de autenticação
 function verificarToken(req, res, next) {
@@ -91,14 +89,12 @@ async function sincronizarNotasEntregues(sessionToken) {
         const notasEntregues = fretes.filter(f => f.entregue === true);
 
         for (const frete of notasEntregues) {
-            // Verifica se já existe
             const existe = await pool.query(
                 'SELECT id FROM contas_receber WHERE numero_nf = $1',
                 [frete.numero_nf]
             );
 
             if (existe.rows.length === 0) {
-                // Cria nova conta a receber
                 await pool.query(
                     `INSERT INTO contas_receber 
                     (numero_nf, valor_nota, orgao, vendedor, data_emissao, dados_frete, status) 
@@ -129,10 +125,19 @@ async function sincronizarNotasEntregues(sessionToken) {
 // ROTAS DA API
 // ============================================
 
+// Health check ANTES de outras rotas
+app.get('/health', (req, res) => {
+    res.json({ 
+        status: 'OK', 
+        service: 'Contas a Receber', 
+        timestamp: new Date().toISOString(),
+        env: process.env.NODE_ENV || 'development'
+    });
+});
+
 // GET - Listar todas as contas
 app.get('/api/contas', verificarToken, async (req, res) => {
     try {
-        // Sincronizar antes de listar
         await sincronizarNotasEntregues(req.headers['x-session-token']);
         
         const result = await pool.query(
@@ -165,7 +170,7 @@ app.get('/api/contas/:id', verificarToken, async (req, res) => {
     }
 });
 
-// POST - Criar nova conta (manual ou automático)
+// POST - Criar nova conta
 app.post('/api/contas', verificarToken, async (req, res) => {
     try {
         const {
@@ -181,7 +186,6 @@ app.post('/api/contas', verificarToken, async (req, res) => {
             dados_frete
         } = req.body;
 
-        // Validações
         if (!numero_nf || !valor_nota || !orgao || !vendedor || !data_emissao) {
             return res.status(400).json({ error: 'Campos obrigatórios faltando' });
         }
@@ -259,26 +263,51 @@ app.post('/api/sincronizar', verificarToken, async (req, res) => {
 });
 
 // ============================================
-// ROTA RAIZ
+// ROTA RAIZ - Deve vir POR ÚLTIMO!
 // ============================================
 app.get('/', (req, res) => {
-    res.sendFile(__dirname + '/public/index.html');
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Health check
-app.get('/health', (req, res) => {
-    res.json({ status: 'OK', service: 'Contas a Receber', timestamp: new Date().toISOString() });
+// Rota catch-all para SPA (ÚLTIMA ROTA!)
+app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api/')) {
+        res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    } else {
+        res.status(404).json({ error: 'Rota não encontrada' });
+    }
+});
+
+// ============================================
+// TRATAMENTO DE ERROS
+// ============================================
+app.use((err, req, res, next) => {
+    console.error('Erro não tratado:', err);
+    res.status(500).json({ 
+        error: 'Erro interno do servidor', 
+        details: process.env.NODE_ENV === 'development' ? err.message : undefined 
+    });
 });
 
 // ============================================
 // INICIAR SERVIDOR
 // ============================================
-app.listen(PORT, () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`💵 Servidor Contas a Receber rodando na porta ${PORT}`);
     console.log(`🌐 http://localhost:${PORT}`);
+    console.log(`📦 Ambiente: ${process.env.NODE_ENV || 'development'}`);
 });
 
-// Tratamento de erros não capturados
+// Graceful shutdown
+process.on('SIGTERM', () => {
+    console.log('SIGTERM recebido, fechando servidor...');
+    server.close(() => {
+        console.log('Servidor fechado');
+        pool.end();
+        process.exit(0);
+    });
+});
+
 process.on('unhandledRejection', (err) => {
     console.error('❌ Unhandled Rejection:', err);
 });
