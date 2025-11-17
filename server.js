@@ -24,14 +24,40 @@ const supabase = createClient(
 console.log('✅ Cliente Supabase inicializado');
 
 // ============================================
+// POSTGRESQL POOL
+// ============================================
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+        rejectUnauthorized: false
+    },
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+});
+
+console.log('✅ Pool PostgreSQL inicializado');
+
+// Testar conexão
+pool.connect((err, client, release) => {
+    if (err) {
+        console.error('❌ Erro ao conectar ao banco:', err.stack);
+    } else {
+        console.log('✅ Conexão com PostgreSQL estabelecida');
+        release();
+    }
+});
+
+// ============================================
 // MIDDLEWARES (ORDEM CORRETA!)
 // ============================================
 app.use(cors({
     origin: [
         'https://ir-comercio-portal-zcan.onrender.com',
         'https://contas-receber.onrender.com',
-        'https://contas-receber-kkf9.onrender.com', // ADICIONE ESTA LINHA!
+        'https://contas-receber-kkf9.onrender.com',
         'https://controle-frete-m4gi.onrender.com',
+        'https://controle-frete.onrender.com',
         'http://localhost:3000',
         'http://localhost:10000'
     ],
@@ -72,7 +98,7 @@ function verificarToken(req, res, next) {
 // ============================================
 async function sincronizarNotasEntregues(sessionToken) {
     try {
-        const response = await fetch(`${process.env.FRETE_API_URL}/fretes`, {
+        const response = await fetch(`${process.env.FRETE_API_URL || 'https://controle-frete.onrender.com'}/fretes`, {
             method: 'GET',
             headers: {
                 'X-Session-Token': sessionToken,
@@ -81,7 +107,7 @@ async function sincronizarNotasEntregues(sessionToken) {
         });
 
         if (!response.ok) {
-            console.log('Erro ao buscar fretes:', response.status);
+            console.log('⚠️ Erro ao buscar fretes:', response.status);
             return;
         }
 
@@ -117,7 +143,7 @@ async function sincronizarNotasEntregues(sessionToken) {
             }
         }
     } catch (error) {
-        console.error('Erro na sincronização:', error.message);
+        console.error('❌ Erro na sincronização:', error.message);
     }
 }
 
@@ -145,7 +171,7 @@ app.get('/api/contas', verificarToken, async (req, res) => {
         );
         res.json(result.rows);
     } catch (error) {
-        console.error('Erro ao listar contas:', error);
+        console.error('❌ Erro ao listar contas:', error);
         res.status(500).json({ error: 'Erro ao listar contas', details: error.message });
     }
 });
@@ -165,7 +191,7 @@ app.get('/api/contas/:id', verificarToken, async (req, res) => {
         
         res.json(result.rows[0]);
     } catch (error) {
-        console.error('Erro ao buscar conta:', error);
+        console.error('❌ Erro ao buscar conta:', error);
         res.status(500).json({ error: 'Erro ao buscar conta', details: error.message });
     }
 });
@@ -195,12 +221,24 @@ app.post('/api/contas', verificarToken, async (req, res) => {
             (numero_nf, valor_nota, orgao, vendedor, data_emissao, valor_pago, data_pagamento, banco, status, dados_frete) 
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
             RETURNING *`,
-            [numero_nf, valor_nota, orgao, vendedor, data_emissao, valor_pago || 0, data_pagamento, banco, status || 'PENDENTE', dados_frete ? JSON.stringify(dados_frete) : null]
+            [
+                numero_nf, 
+                valor_nota, 
+                orgao, 
+                vendedor, 
+                data_emissao, 
+                valor_pago || 0, 
+                data_pagamento, 
+                banco, 
+                status || 'PENDENTE', 
+                dados_frete ? JSON.stringify(dados_frete) : null
+            ]
         );
 
+        console.log(`✅ Conta criada: ${numero_nf}`);
         res.status(201).json(result.rows[0]);
     } catch (error) {
-        console.error('Erro ao criar conta:', error);
+        console.error('❌ Erro ao criar conta:', error);
         res.status(500).json({ error: 'Erro ao criar conta', details: error.message });
     }
 });
@@ -213,7 +251,7 @@ app.patch('/api/contas/:id', verificarToken, async (req, res) => {
 
         const result = await pool.query(
             `UPDATE contas_receber 
-            SET valor_pago = $1, banco = $2, data_pagamento = $3, status = $4
+            SET valor_pago = $1, banco = $2, data_pagamento = $3, status = $4, updated_at = NOW()
             WHERE id = $5 
             RETURNING *`,
             [valor_pago, banco, data_pagamento, status, id]
@@ -223,9 +261,10 @@ app.patch('/api/contas/:id', verificarToken, async (req, res) => {
             return res.status(404).json({ error: 'Conta não encontrada' });
         }
 
+        console.log(`✅ Pagamento registrado para conta ${id}`);
         res.json(result.rows[0]);
     } catch (error) {
-        console.error('Erro ao registrar pagamento:', error);
+        console.error('❌ Erro ao registrar pagamento:', error);
         res.status(500).json({ error: 'Erro ao registrar pagamento', details: error.message });
     }
 });
@@ -244,9 +283,10 @@ app.delete('/api/contas/:id', verificarToken, async (req, res) => {
             return res.status(404).json({ error: 'Conta não encontrada' });
         }
 
+        console.log(`✅ Conta excluída: ${id}`);
         res.json({ message: 'Conta excluída com sucesso', conta: result.rows[0] });
     } catch (error) {
-        console.error('Erro ao excluir conta:', error);
+        console.error('❌ Erro ao excluir conta:', error);
         res.status(500).json({ error: 'Erro ao excluir conta', details: error.message });
     }
 });
@@ -257,7 +297,7 @@ app.post('/api/sincronizar', verificarToken, async (req, res) => {
         await sincronizarNotasEntregues(req.headers['x-session-token']);
         res.json({ message: 'Sincronização realizada com sucesso' });
     } catch (error) {
-        console.error('Erro na sincronização:', error);
+        console.error('❌ Erro na sincronização:', error);
         res.status(500).json({ error: 'Erro na sincronização', details: error.message });
     }
 });
@@ -282,7 +322,7 @@ app.get('*', (req, res) => {
 // TRATAMENTO DE ERROS
 // ============================================
 app.use((err, req, res, next) => {
-    console.error('Erro não tratado:', err);
+    console.error('❌ Erro não tratado:', err);
     res.status(500).json({ 
         error: 'Erro interno do servidor', 
         details: process.env.NODE_ENV === 'development' ? err.message : undefined 
@@ -293,21 +333,43 @@ app.use((err, req, res, next) => {
 // INICIAR SERVIDOR
 // ============================================
 const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`💵 Servidor Contas a Receber rodando na porta ${PORT}`);
-    console.log(`🌐 http://localhost:${PORT}`);
+    console.log('═══════════════════════════════════════════');
+    console.log('💵 CONTAS A RECEBER - SERVIDOR INICIADO');
+    console.log('═══════════════════════════════════════════');
+    console.log(`🌐 Porta: ${PORT}`);
     console.log(`📦 Ambiente: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🔗 URL: http://localhost:${PORT}`);
+    console.log('═══════════════════════════════════════════');
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-    console.log('SIGTERM recebido, fechando servidor...');
+    console.log('⚠️ SIGTERM recebido, fechando servidor...');
     server.close(() => {
-        console.log('Servidor fechado');
-        pool.end();
-        process.exit(0);
+        console.log('✅ Servidor fechado');
+        pool.end(() => {
+            console.log('✅ Pool PostgreSQL fechado');
+            process.exit(0);
+        });
+    });
+});
+
+process.on('SIGINT', () => {
+    console.log('⚠️ SIGINT recebido, fechando servidor...');
+    server.close(() => {
+        console.log('✅ Servidor fechado');
+        pool.end(() => {
+            console.log('✅ Pool PostgreSQL fechado');
+            process.exit(0);
+        });
     });
 });
 
 process.on('unhandledRejection', (err) => {
     console.error('❌ Unhandled Rejection:', err);
+});
+
+process.on('uncaughtException', (err) => {
+    console.error('❌ Uncaught Exception:', err);
+    process.exit(1);
 });
