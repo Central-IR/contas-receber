@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contas a Receber</title>
+    <link rel="icon" type="image/png" href="I.R.-COMERCIO-E-MATERIAIS-ELETRICOS-PRETO.png">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Splash Screen -->
+    <div class="splash-screen" id="splashScreen">
+        <h1 class="splash-title">Contas a Receber</h1>
+    </div>
+
+    <!-- Conteúdo Principal -->
+    <div class="app-content">
+        <div class="container">
+            <div class="header">
+                <h1>Contas a Receber</h1>
+                <div id="connectionStatus" class="connection-status offline">
+                    <span class="status-dot"></span>
+                </div>
+            </div>
+
+            <!-- NAVEGAÇÃO POR MESES -->
+            <div class="card">
+                <div class="month-navigation">
+                    <button onclick="previousMonth()" class="month-nav-btn">Anterior</button>
+                    <h3 id="currentMonthDisplay" class="month-display">Carregando...</h3>
+                    <button onclick="nextMonth()" class="month-nav-btn">Próximo</button>
+                </div>
+            </div>
+
+            <!-- Dashboard -->
+            <div class="dashboard-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Faturado</div>
+                    <div class="stat-value stat-success" id="statFaturado">R$ 0,00</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Pago</div>
+                    <div class="stat-value stat-success" id="statPago">R$ 0,00</div>
+                </div>
+                <div class="stat-card stat-card-alert" id="cardVencido">
+                    <div class="stat-label">Vencido</div>
+                    <div class="stat-value stat-danger" id="statVencido">R$ 0,00</div>
+                    <div class="pulse-badge" id="pulseBadgeVencido" style="display: none;">!</div>
+                </div>
+                <div class="stat-card stat-card-warning" id="cardPendente">
+                    <div class="stat-label">Pendente</div>
+                    <div class="stat-value stat-warning" id="statPendente">R$ 0,00</div>
+                    <div class="pulse-badge" id="pulseBadgePendente" style="display: none;">!</div>
+                </div>
+            </div>
+
+            <!-- FILTROS -->
+            <div class="card">
+                <h2>Filtros</h2>
+                <div class="filter-section">
+                    <div class="form-group">
+                        <label for="search">Pesquisar</label>
+                        <input type="text" id="search" placeholder="NF, órgão, vendedor..." oninput="filterContas()">
+                    </div>
+                    <div class="form-group">
+                        <label for="filterVendedor">Vendedor</label>
+                        <select id="filterVendedor" onchange="filterContas()">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="filterStatus">Status</label>
+                        <select id="filterStatus" onchange="filterContas()">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="filterBanco">Banco</label>
+                        <select id="filterBanco" onchange="filterContas()">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LISTA DE CONTAS -->
+            <div class="card">
+                <h2>Lista de Contas a Receber</h2>
+                <div id="contasContainer"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
