@@ -100,10 +100,13 @@ function inicializarApp() {
 }
 
 // ============================================
-// SINCRONIZAÇÃO COM CONTROLE DE FRETE
+// SINCRONIZAÇÃO CORRIGIDA - CONTAS A RECEBER
 // ============================================
+
 async function sincronizarNotasEntregues() {
     if (!isOnline) return;
+
+    console.log('🔄 Iniciando sincronização...');
 
     try {
         const response = await fetch(`${FRETE_API_URL}/fretes`, {
@@ -115,20 +118,34 @@ async function sincronizarNotasEntregues() {
             mode: 'cors'
         });
 
-        if (!response.ok) return;
+        if (!response.ok) {
+            console.log('⚠️ Erro ao buscar fretes:', response.status);
+            return;
+        }
 
         const fretes = await response.json();
-        const notasEntregues = fretes.filter(f => f.entregue === true);
+        console.log(`📦 ${fretes.length} fretes encontrados`);
+        
+        // Buscar fretes com status ENTREGUE OU campo entregue=true
+        const notasEntregues = fretes.filter(f => {
+            return f.status === 'ENTREGUE' || f.entregue === true;
+        });
+
+        console.log(`✅ ${notasEntregues.length} fretes entregues encontrados`);
 
         for (const frete of notasEntregues) {
+            console.log(`📋 Verificando frete NF: ${frete.numero_nf}`);
+            
             const jaExiste = contas.find(c => c.numero_nf === frete.numero_nf);
             
             if (!jaExiste) {
+                console.log(`➕ Criando conta para NF: ${frete.numero_nf}`);
+                
                 const novaConta = {
                     numero_nf: frete.numero_nf,
-                    valor_nota: frete.valor_nota,
-                    orgao: frete.orgao,
-                    vendedor: frete.vendedor_responsavel,
+                    valor_nota: frete.valor_nf, // ✅ CORRIGIDO: valor_nf (não valor_nota)
+                    orgao: frete.orgao || frete.nome_orgao, // ✅ Tentar ambos os campos
+                    vendedor: frete.vendedor_responsavel || frete.vendedor, // ✅ Tentar ambos os campos
                     data_emissao: frete.data_emissao,
                     valor_pago: 0,
                     data_pagamento: null,
@@ -136,17 +153,21 @@ async function sincronizarNotasEntregues() {
                     status: 'PENDENTE',
                     dados_frete: {
                         transportadora: frete.transportadora,
-                        rastreio: frete.rastreio,
-                        data_entrega: frete.data_entrega_realizada || frete.data_entrega
+                        rastreio: frete.rastreio || frete.numero_nf, // Usar NF como rastreio se não tiver
+                        data_entrega: frete.data_entrega_realizada || frete.previsao_entrega
                     }
                 };
 
+                console.log('📤 Dados a enviar:', novaConta);
+
                 await criarContaAutomatica(novaConta);
+            } else {
+                console.log(`⏭️ Conta já existe para NF: ${frete.numero_nf}`);
             }
         }
 
     } catch (error) {
-        console.error('Erro ao sincronizar notas:', error);
+        console.error('❌ Erro na sincronização:', error);
     }
 }
 
@@ -166,13 +187,19 @@ async function criarContaAutomatica(contaData) {
         if (response.ok) {
             const novaConta = await response.json();
             contas.push(novaConta);
-            console.log(`Nota ${contaData.numero_nf} importada automaticamente`);
+            console.log(`✅ Nota ${contaData.numero_nf} importada automaticamente`);
             updateAllFilters();
             updateDashboard();
             filterContas();
+            
+            // Mostrar notificação visual
+            showMessage(`Nota ${contaData.numero_nf} importada automaticamente!`, 'success');
+        } else {
+            const errorData = await response.json();
+            console.error('❌ Erro ao criar conta:', errorData);
         }
     } catch (error) {
-        console.error('Erro ao criar conta automática:', error);
+        console.error('❌ Erro ao criar conta automática:', error);
     }
 }
 
