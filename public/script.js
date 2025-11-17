@@ -2,7 +2,7 @@
 // CONFIGURAÇÃO
 // ============================================
 const PORTAL_URL = 'https://ir-comercio-portal-zcan.onrender.com';
-const API_URL = 'https://contas-receber-kkf9.onrender.com';
+const API_URL = 'https://contas-receber-kkf9.onrender.com/api';
 const FRETE_API_URL = 'https://controle-frete.onrender.com';
 
 let contas = [];
