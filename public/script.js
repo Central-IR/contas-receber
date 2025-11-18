@@ -1,11 +1,11 @@
 // ============================================
-// CONFIGURACAO
+// CONFIGURAÇÃO
 // ============================================
 const PORTAL_URL = 'https://ir-comercio-portal-zcan.onrender.com';
-const API_URL = 'https://contas-receber-kkf9.onrender.com/api';
-const FRETE_API_URL = 'https://controle-frete.onrender.com/api';
+const API_URL= 'https://contas-receber-kkf9.onrender.com'
+const API_URL = 'https://cotacoes-frete-aikc.onrender.com/api';
 
-let contas = [];
+let cotacoes = [];
 let isOnline = false;
 let lastDataHash = '';
 let sessionToken = null;
@@ -13,30 +13,25 @@ let currentMonth = new Date().getMonth();
 let currentYear = new Date().getFullYear();
 
 const meses = [
-    'Janeiro', 'Fevereiro', 'Mar?o', 'Abril', 'Maio', 'Junho',
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
 ];
 
-console.log('Contas a Receber iniciada');
+console.log('🚀 Cotações de Frete iniciada');
 
 document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => {
-        document.getElementById('splashScreen').style.display = 'none';
-        document.querySelector('.app-content').style.display = 'block';
-    }, 1500);
     verificarAutenticacao();
 });
 
 // ============================================
-// NAVEGA??O POR MESES
+// NAVEGAÇÃO POR MESES
 // ============================================
 function updateMonthDisplay() {
     const display = document.getElementById('currentMonthDisplay');
     if (display) {
         display.textContent = `${meses[currentMonth]} ${currentYear}`;
     }
-    updateDashboard();
-    filterContas();
+    filterCotacoes();
 }
 
 window.previousMonth = function() {
@@ -58,277 +53,11 @@ window.nextMonth = function() {
 };
 
 // ============================================
-// AUTENTICA??O
-// ============================================
-function verificarAutenticacao() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const tokenFromUrl = urlParams.get('sessionToken');
-
-    if (tokenFromUrl) {
-        sessionToken = tokenFromUrl;
-        sessionStorage.setItem('contasReceberSession', tokenFromUrl);
-        window.history.replaceState({}, document.title, window.location.pathname);
-    } else {
-        sessionToken = sessionStorage.getItem('contasReceberSession');
-    }
-
-    if (!sessionToken) {
-        mostrarTelaAcessoNegado();
-        return;
-    }
-
-    inicializarApp();
-}
-
-function mostrarTelaAcessoNegado(mensagem = 'N?O AUTORIZADO') {
-    document.body.innerHTML = `
-        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: var(--bg-primary); color: var(--text-primary); text-align: center; padding: 2rem;">
-            <h1 style="font-size: 2.2rem; margin-bottom: 1rem;">${mensagem}</h1>
-            <p style="color: var(--text-secondary); margin-bottom: 2rem;">Somente usu?rios autenticados podem acessar esta ?rea.</p>
-            <a href="${PORTAL_URL}" style="display: inline-block; background: var(--btn-register); color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600;">Ir para o Portal</a>
-        </div>
-    `;
-}
-
-function inicializarApp() {
-    updateMonthDisplay();
-    checkServerStatus();
-    setInterval(checkServerStatus, 15000);
-    startPolling();
-    sincronizarNotasEntregues();
-    setInterval(sincronizarNotasEntregues, 30000);
-}
-
-// ============================================
-// SINCRONIZA??O COM CONTROLE DE FRETE
-// ============================================
-async function sincronizarNotasEntregues() {
-    if (!isOnline) return;
-
-    try {
-        const response = await fetch(`${FRETE_API_URL}/fretes`, {
-            method: 'GET',
-            headers: { 
-                'X-Session-Token': sessionToken,
-                'Accept': 'application/json'
-            },
-            mode: 'cors'
-        });
-
-        if (!response.ok) return;
-
-        const fretes = await response.json();
-        const notasEntregues = fretes.filter(f => f.entregue === true);
-
-        for (const frete of notasEntregues) {
-            const jaExiste = contas.find(c => c.numero_nf === frete.numero_nf);
-            
-            if (!jaExiste) {
-                const novaConta = {
-                    numero_nf: frete.numero_nf,
-                    valor_nota: frete.valor_nota,
-                    orgao: frete.orgao,
-                    vendedor: frete.vendedor_responsavel,
-                    data_emissao: frete.data_emissao,
-                    valor_pago: 0,
-                    data_pagamento: null,
-                    banco: null,
-                    status: 'PENDENTE',
-                    dados_frete: {
-                        transportadora: frete.transportadora,
-                        rastreio: frete.rastreio,
-                        data_entrega: frete.data_entrega_realizada || frete.data_entrega
-                    }
-                };
-
-                await criarContaAutomatica(novaConta);
-            }
-        }
-
-    } catch (error) {
-        console.error('Erro ao sincronizar notas:', error);
-    }
-}
-
-async function criarContaAutomatica(contaData) {
-    try {
-        const response = await fetch(`${API_URL}/contas`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Session-Token': sessionToken,
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify(contaData),
-            mode: 'cors'
-        });
-
-        if (response.ok) {
-            const novaConta = await response.json();
-            contas.push(novaConta);
-            console.log(`Nota ${contaData.numero_nf} importada automaticamente`);
-            updateAllFilters();
-            updateDashboard();
-            filterContas();
-        }
-    } catch (error) {
-        console.error('Erro ao criar conta autom?tica:', error);
-    }
-}
-
-// ============================================
-// CONEX?O E STATUS
-// ============================================
-async function checkServerStatus() {
-    try {
-        const response = await fetch(`${API_URL}/contas`, {
-            method: 'GET',
-            headers: { 
-                'X-Session-Token': sessionToken,
-                'Accept': 'application/json'
-            },
-            mode: 'cors'
-        });
-
-        if (response.status === 401) {
-            sessionStorage.removeItem('contasReceberSession');
-            mostrarTelaAcessoNegado('Sua sess?o expirou');
-            return false;
-        }
-
-        const wasOffline = !isOnline;
-        isOnline = response.ok;
-        
-        if (wasOffline && isOnline) {
-            console.log('Servidor ONLINE');
-            await loadContas();
-        }
-        
-        updateConnectionStatus();
-        return isOnline;
-    } catch (error) {
-        isOnline = false;
-        updateConnectionStatus();
-        return false;
-    }
-}
-
-function updateConnectionStatus() {
-    const statusElement = document.getElementById('connectionStatus');
-    if (statusElement) {
-        statusElement.className = isOnline ? 'connection-status online' : 'connection-status offline';
-    }
-}
-
-// ============================================
-// CARREGAMENTO DE DADOS
-// ============================================
-async function loadContas() {
-    if (!isOnline) return;
-
-    try {
-        const response = await fetch(`${API_URL}/contas`, {
-            method: 'GET',
-            headers: { 
-                'X-Session-Token': sessionToken,
-                'Accept': 'application/json'
-            },
-            mode: 'cors'
-        });
-
-        if (response.status === 401) {
-            sessionStorage.removeItem('contasReceberSession');
-            mostrarTelaAcessoNegado('Sua sess?o expirou');
-            return;
-        }
-
-        if (!response.ok) return;
-
-        const data = await response.json();
-        contas = data;
-        
-        const newHash = JSON.stringify(contas.map(c => c.id));
-        if (newHash !== lastDataHash) {
-            lastDataHash = newHash;
-            console.log(`${contas.length} contas carregadas`);
-            updateAllFilters();
-            updateDashboard();
-            filterContas();
-        }
-    } catch (error) {
-        console.error('Erro ao carregar:', error);
-    }
-}
-
-function startPolling() {
-    loadContas();
-    setInterval(() => {
-        if (isOnline) loadContas();
-    }, 10000);
-}
-
-// ============================================
-// DASHBOARD
-// ============================================
-function updateDashboard() {
-    const contasDoMes = contas.filter(c => {
-        const dataEmissao = new Date(c.data_emissao + 'T00:00:00');
-        return dataEmissao.getMonth() === currentMonth && dataEmissao.getFullYear() === currentYear;
-    });
-    
-    const faturado = contasDoMes.reduce((sum, c) => sum + parseFloat(c.valor_nota || 0), 0);
-    const pago = contasDoMes.reduce((sum, c) => sum + parseFloat(c.valor_pago || 0), 0);
-    
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    
-    const vencido = contasDoMes.filter(c => {
-        if (c.status === 'PAGO') return false;
-        const dataEmissao = new Date(c.data_emissao + 'T00:00:00');
-        const prazo30 = new Date(dataEmissao);
-        prazo30.setDate(prazo30.getDate() + 30);
-        return prazo30 < hoje;
-    }).reduce((sum, c) => sum + (parseFloat(c.valor_nota || 0) - parseFloat(c.valor_pago || 0)), 0);
-    
-    const pendente = contasDoMes.filter(c => c.status !== 'PAGO')
-        .reduce((sum, c) => sum + (parseFloat(c.valor_nota || 0) - parseFloat(c.valor_pago || 0)), 0);
-    
-    document.getElementById('statFaturado').textContent = `R$ ${faturado.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-    document.getElementById('statPago').textContent = `R$ ${pago.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-    document.getElementById('statVencido').textContent = `R$ ${vencido.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-    document.getElementById('statPendente').textContent = `R$ ${pendente.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-    
-    const cardVencido = document.getElementById('cardVencido');
-    const badgeVencido = document.getElementById('pulseBadgeVencido');
-    
-    if (vencido > 0) {
-        cardVencido.classList.add('has-alert');
-        badgeVencido.style.display = 'flex';
-        badgeVencido.textContent = '!';
-    } else {
-        cardVencido.classList.remove('has-alert');
-        badgeVencido.style.display = 'none';
-    }
-    
-    const cardPendente = document.getElementById('cardPendente');
-    const badgePendente = document.getElementById('pulseBadgePendente');
-    
-    if (pendente > 0) {
-        cardPendente.classList.add('has-warning');
-        badgePendente.style.display = 'flex';
-        badgePendente.textContent = '!';
-    } else {
-        cardPendente.classList.remove('has-warning');
-        badgePendente.style.display = 'none';
-    }
-}
-
-// ============================================
-// MODAL DE CONFIRMA??O
+// MODAL DE CONFIRMAÇÃO PERSONALIZADO
 // ============================================
 function showConfirm(message, options = {}) {
     return new Promise((resolve) => {
-        const { title = 'Confirma??o', confirmText = 'Confirmar', cancelText = 'Cancelar', type = 'warning' } = options;
+        const { title = 'Confirmação', confirmText = 'Confirmar', cancelText = 'Cancelar', type = 'warning' } = options;
 
         const modalHTML = `
             <div class="modal-overlay" id="confirmModal" style="z-index: 10001;">
@@ -371,195 +100,546 @@ function showConfirm(message, options = {}) {
 }
 
 // ============================================
-// MODAL DE PAGAMENTO
+// AUTENTICAÇÃO
 // ============================================
-function showPagamentoModal(conta) {
-    const valorRestante = parseFloat(conta.valor_nota) - parseFloat(conta.valor_pago || 0);
+function verificarAutenticacao() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tokenFromUrl = urlParams.get('sessionToken');
+
+    if (tokenFromUrl) {
+        sessionToken = tokenFromUrl;
+        sessionStorage.setItem('cotacoesFreteSession', tokenFromUrl);
+        window.history.replaceState({}, document.title, window.location.pathname);
+    } else {
+        sessionToken = sessionStorage.getItem('cotacoesFreteSession');
+    }
+
+    if (!sessionToken) {
+        mostrarTelaAcessoNegado();
+        return;
+    }
+
+    inicializarApp();
+}
+
+function mostrarTelaAcessoNegado(mensagem = 'NÃO AUTORIZADO') {
+    document.body.innerHTML = `
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: var(--bg-primary); color: var(--text-primary); text-align: center; padding: 2rem;">
+            <h1 style="font-size: 2.2rem; margin-bottom: 1rem;">${mensagem}</h1>
+            <p style="color: var(--text-secondary); margin-bottom: 2rem;">Somente usuários autenticados podem acessar esta área.</p>
+            <a href="${PORTAL_URL}" style="display: inline-block; background: var(--btn-register); color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600;">Ir para o Portal</a>
+        </div>
+    `;
+}
+
+function inicializarApp() {
+    updateMonthDisplay();
+    checkServerStatus();
+    setInterval(checkServerStatus, 15000);
+    startPolling();
+}
+
+// ============================================
+// CONEXÃO E STATUS
+// ============================================
+async function checkServerStatus() {
+    try {
+        const response = await fetch(`${API_URL}/cotacoes`, {
+            method: 'GET',
+            headers: { 
+                'X-Session-Token': sessionToken,
+                'Accept': 'application/json'
+            },
+            mode: 'cors'
+        });
+
+        if (response.status === 401) {
+            sessionStorage.removeItem('cotacoesFreteSession');
+            mostrarTelaAcessoNegado('Sua sessão expirou');
+            return false;
+        }
+
+        const wasOffline = !isOnline;
+        isOnline = response.ok;
+        
+        if (wasOffline && isOnline) {
+            console.log('✅ SERVIDOR ONLINE');
+            await loadCotacoes();
+        }
+        
+        updateConnectionStatus();
+        return isOnline;
+    } catch (error) {
+        isOnline = false;
+        updateConnectionStatus();
+        return false;
+    }
+}
+
+function updateConnectionStatus() {
+    const statusElement = document.getElementById('connectionStatus');
+    const statusText = document.getElementById('statusText');
+    if (statusElement) {
+        statusElement.className = isOnline ? 'connection-status online' : 'connection-status offline';
+        if (statusText) {
+            statusText.textContent = isOnline ? 'Online' : 'Offline';
+        }
+    }
+}
+
+// ============================================
+// MAPEAMENTO DE COLUNAS - CORRIGIDO
+// ============================================
+function mapearCotacao(cotacao) {
+    // CORREÇÃO: Normalizar responsável
+    let responsavel = cotacao.responsavel || cotacao.RESPONSAVEL || '';
+    if (responsavel.toLowerCase() === 'gustavo') responsavel = 'GUSTAVO';
+    if (responsavel.toLowerCase() === 'isaque') responsavel = 'ISAQUE';
+
+    return {
+        id: cotacao.id,
+        timestamp: cotacao.timestamp,
+        responsavel: responsavel,
+        documento: cotacao.documento || cotacao.DOCUMENTO || '',
+        vendedor: cotacao.vendedor || cotacao.VENDEDOR || '',
+        transportadora: cotacao.transportadora || cotacao.TRANSPORTADORA || '',
+        destino: cotacao.destino || cotacao.DESTINO || '',
+        numeroCotacao: cotacao.numeroCotacao || cotacao.NUMEROCOTACAO || '',
+        valorFrete: cotacao.valorFrete || cotacao.VALORFRETE || cotacao.valor || cotacao.VALOR || 0,
+        previsaoEntrega: cotacao.previsaoEntrega || cotacao.PREVISAOENTREGA || cotacao.previsao || cotacao.PREVISAO || '',
+        canalComunicacao: cotacao.canalComunicacao || cotacao.CANALCOMUNICACAO || '',
+        codigoColeta: cotacao.codigoColeta || cotacao.CODIGOCOLETA || '',
+        responsavelTransportadora: cotacao.responsavelTransportadora || cotacao.RESPONSAVELTRANSPORTADORA || '',
+        dataCotacao: cotacao.dataCotacao || cotacao.DATACOTACAO || cotacao.data || cotacao.DATA || '',
+        observacoes: cotacao.observacoes || cotacao.OBSERVACOES || '',
+        negocioFechado: cotacao.negocioFechado || cotacao.NEGOCIOFECHADO || cotacao.status === 'fechado' || cotacao.STATUS === 'FECHADO' || false
+    };
+}
+
+// ============================================
+// CARREGAMENTO DE DADOS
+// ============================================
+async function loadCotacoes() {
+    if (!isOnline) return;
+
+    try {
+        const response = await fetch(`${API_URL}/cotacoes`, {
+            method: 'GET',
+            headers: { 
+                'X-Session-Token': sessionToken,
+                'Accept': 'application/json'
+            },
+            mode: 'cors'
+        });
+
+        if (response.status === 401) {
+            sessionStorage.removeItem('cotacoesFreteSession');
+            mostrarTelaAcessoNegado('Sua sessão expirou');
+            return;
+        }
+
+        if (!response.ok) return;
+
+        const data = await response.json();
+        cotacoes = data.map(mapearCotacao);
+        
+        const newHash = JSON.stringify(cotacoes.map(c => c.id));
+        if (newHash !== lastDataHash) {
+            lastDataHash = newHash;
+            console.log(`${cotacoes.length} cotações carregadas`);
+            updateAllFilters();
+            filterCotacoes();
+        }
+    } catch (error) {
+        console.error('Erro ao carregar:', error);
+    }
+}
+
+function startPolling() {
+    loadCotacoes();
+    setInterval(() => {
+        if (isOnline) loadCotacoes();
+    }, 10000);
+}
+
+// ============================================
+// TOGGLE NEGÓCIO FECHADO
+// ============================================
+window.toggleNegocioFechado = async function(id) {
+    const idStr = String(id);
+    const cotacao = cotacoes.find(c => String(c.id) === idStr);
+    if (!cotacao) return;
+
+    const novoStatus = !cotacao.negocioFechado;
+    cotacao.negocioFechado = novoStatus;
+    filterCotacoes();
     
+    showMessage(`Negócio marcado como ${novoStatus ? 'aprovado' : 'reprovado'}!`, 'success');
+
+    if (isOnline) {
+        try {
+            const response = await fetch(`${API_URL}/cotacoes/${idStr}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Session-Token': sessionToken,
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(cotacao),
+                mode: 'cors'
+            });
+
+            if (!response.ok) throw new Error('Erro ao atualizar');
+
+            const savedData = await response.json();
+            const index = cotacoes.findIndex(c => String(c.id) === idStr);
+            if (index !== -1) cotacoes[index] = mapearCotacao(savedData);
+        } catch (error) {
+            cotacao.negocioFechado = !novoStatus;
+            filterCotacoes();
+            showMessage('Erro ao atualizar status', 'error');
+        }
+    }
+};
+
+// ============================================
+// FORMULÁRIO - CORRIGIDO
+// ============================================
+window.toggleForm = function() {
+    showFormModal(null);
+};
+
+function showFormModal(editingId = null) {
+    const isEditing = editingId !== null;
+    let cotacao = null;
+    
+    if (isEditing) {
+        const idStr = String(editingId);
+        cotacao = cotacoes.find(c => String(c.id) === idStr);
+        
+        if (!cotacao) {
+            showMessage('Cotação não encontrada!', 'error');
+            return;
+        }
+    }
+
     const modalHTML = `
-        <div class="modal-overlay" id="pagamentoModal">
-            <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-overlay" id="formModal">
+            <div class="modal-content">
                 <div class="modal-header">
-                    <h3 class="modal-title">Registrar Pagamento</h3>
+                    <h3 class="modal-title">${isEditing ? 'Editar Cotação' : 'Nova Cotação'}</h3>
                 </div>
                 
-                <div class="info-section" style="margin-bottom: 1.5rem;">
-                    <p><strong>NF:</strong> ${conta.numero_nf}</p>
-                    <p><strong>?rg?o:</strong> ${conta.orgao}</p>
-                    <p><strong>Valor da Nota:</strong> R$ ${parseFloat(conta.valor_nota).toFixed(2)}</p>
-                    <p><strong>J? Pago:</strong> R$ ${parseFloat(conta.valor_pago || 0).toFixed(2)}</p>
-                    <p><strong>Restante:</strong> <span style="color: var(--danger-color); font-weight: bold;">R$ ${valorRestante.toFixed(2)}</span></p>
+                <div class="tabs-container">
+                    <div class="tabs-nav">
+                        <button class="tab-btn active" onclick="switchFormTab(0)">Geral</button>
+                        <button class="tab-btn" onclick="switchFormTab(1)">Transportadora</button>
+                        <button class="tab-btn" onclick="switchFormTab(2)">Detalhes</button>
+                    </div>
+
+                    <form id="cotacaoForm" onsubmit="handleSubmit(event)">
+                        <input type="hidden" id="editId" value="${editingId || ''}">
+                        
+                        <div class="tab-content active" id="tab-geral">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="responsavel">Responsável pela Cotação *</label>
+                                    <select id="responsavel" required>
+                                        <option value="">Selecione...</option>
+                                        <option value="ROBERTO" ${cotacao?.responsavel === 'ROBERTO' ? 'selected' : ''}>ROBERTO</option>
+                                        <option value="ISAQUE" ${cotacao?.responsavel === 'ISAQUE' ? 'selected' : ''}>ISAQUE</option>
+                                        <option value="MIGUEL" ${cotacao?.responsavel === 'MIGUEL' ? 'selected' : ''}>MIGUEL</option>
+                                        <option value="GUSTAVO" ${cotacao?.responsavel === 'GUSTAVO' ? 'selected' : ''}>GUSTAVO</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="documento">Documento *</label>
+                                    <input type="text" id="documento" value="${cotacao?.documento || ''}" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="vendedor">Vendedor</label>
+                                    <select id="vendedor">
+                                        <option value="">Selecione...</option>
+                                        <option value="ROBERTO" ${cotacao?.vendedor === 'ROBERTO' ? 'selected' : ''}>ROBERTO</option>
+                                        <option value="ISAQUE" ${cotacao?.vendedor === 'ISAQUE' ? 'selected' : ''}>ISAQUE</option>
+                                        <option value="MIGUEL" ${cotacao?.vendedor === 'MIGUEL' ? 'selected' : ''}>MIGUEL</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="tab-content" id="tab-transportadora">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                     <label for="transportadora">Transportadora</label>
+                                    <select id="transportadora">
+                                        <option value="">Selecione...</option>
+                                        <option value="TNT MERCÚRIO" ${cotacao?.transportadora === 'TNT MERCÚRIO' ? 'selected' : ''}>TNT MERCÚRIO</option>
+                                        <option value="JAMEF" ${cotacao?.transportadora === 'JAMEF' ? 'selected' : ''}>JAMEF</option>
+                                        <option value="BRASPRESS" ${cotacao?.transportadora === 'BRASPRESS' ? 'selected' : ''}>BRASPRESS</option>
+                                        <option value="GENEROSO" ${cotacao?.transportadora === 'GENEROSO' ? 'selected' : ''}>GENEROSO</option>
+                                        <option value="CONTINENTAL" ${cotacao?.transportadora === 'CONTINENTAL' ? 'selected' : ''}>CONTINENTAL</option>
+                                        <option value="JEOLOG" ${cotacao?.transportadora === 'JEOLOG' ? 'selected' : ''}>JEOLOG</option>
+                                        <option value="TG TRANSPORTES" ${cotacao?.transportadora === 'TG TRANSPORTES' ? 'selected' : ''}>TG TRANSPORTES</option>
+                                        <option value="CORREIOS" ${cotacao?.transportadora === 'CORREIOS' ? 'selected' : ''}>CORREIOS</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="destino">Cidade-UF *</label>
+                                    <input type="text" id="destino" value="${cotacao?.destino || ''}" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="numeroCotacao">Número da Cotação</label>
+                                    <input type="text" id="numeroCotacao" value="${cotacao?.numeroCotacao || ''}">
+                                </div>
+                                <div class="form-group">
+                                    <label for="valorFrete">Valor do Frete (R$) *</label>
+                                    <input type="number" id="valorFrete" step="0.01" min="0" value="${cotacao?.valorFrete || ''}" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="previsaoEntrega">Previsão de Entrega</label>
+                                    <input type="date" id="previsaoEntrega" value="${cotacao?.previsaoEntrega || ''}">
+                                </div>
+                                <div class="form-group">
+                                    <label for="canalComunicacao">Canal de Comunicação</label>
+                                    <input type="text" id="canalComunicacao" value="${cotacao?.canalComunicacao || ''}" placeholder="Ex: WhatsApp, E-mail">
+                                </div>
+                                <div class="form-group">
+                                    <label for="codigoColeta">Código de Coleta</label>
+                                    <input type="text" id="codigoColeta" value="${cotacao?.codigoColeta || ''}">
+                                </div>
+                                <div class="form-group">
+                                    <label for="responsavelTransportadora">Responsável da Transportadora</label>
+                                    <input type="text" id="responsavelTransportadora" value="${cotacao?.responsavelTransportadora || ''}">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="tab-content" id="tab-detalhes">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="dataCotacao">Data da Cotação *</label>
+                                    <input type="date" id="dataCotacao" value="${cotacao?.dataCotacao || new Date().toISOString().split('T')[0]}" required>
+                                </div>
+                                <div class="form-group" style="grid-column: 1 / -1;">
+                                    <label for="observacoes">Observações</label>
+                                    <textarea id="observacoes" rows="4">${cotacao?.observacoes || ''}</textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="modal-actions">
+                            <button type="submit" class="save">${isEditing ? 'Atualizar' : 'Salvar'}</button>
+                            <button type="button" class="secondary" onclick="closeFormModal()">Cancelar</button>
+                        </div>
+                    </form>
                 </div>
-
-                <form id="pagamentoForm" onsubmit="handlePagamento(event, '${conta.id}')">
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="valor_pagamento">Valor Pago (R$) *</label>
-                            <input type="number" id="valor_pagamento" step="0.01" min="0.01" max="${valorRestante}" value="${valorRestante}" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="banco_pagamento">Banco *</label>
-                            <select id="banco_pagamento" required>
-                                <option value="">Selecione...</option>
-                                <option value="BANCO DO BRASIL">Banco do Brasil</option>
-                                <option value="CAIXA">Caixa Econ?mica</option>
-                                <option value="BRADESCO">Bradesco</option>
-                                <option value="ITAU">Ita?</option>
-                                <option value="SANTANDER">Santander</option>
-                                <option value="SICOOB">Sicoob</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="modal-actions">
-                        <button type="submit" class="save">Confirmar Pagamento</button>
-                        <button type="button" class="secondary" onclick="closePagamentoModal()">Cancelar</button>
-                    </div>
-                </form>
             </div>
         </div>
     `;
 
     document.body.insertAdjacentHTML('beforeend', modalHTML);
-    setTimeout(() => document.getElementById('valor_pagamento')?.focus(), 100);
+    
+    const camposMaiusculas = ['documento', 'destino', 'numeroCotacao', 'canalComunicacao', 
+                               'codigoColeta', 'responsavelTransportadora', 'observacoes'];
+
+    camposMaiusculas.forEach(campoId => {
+        const campo = document.getElementById(campoId);
+        if (campo) {
+            campo.addEventListener('input', (e) => {
+                const start = e.target.selectionStart;
+                e.target.value = e.target.value.toUpperCase();
+                e.target.setSelectionRange(start, start);
+            });
+        }
+    });
+    
+    setTimeout(() => document.getElementById('responsavel')?.focus(), 100);
 }
 
-function closePagamentoModal() {
-    const modal = document.getElementById('pagamentoModal');
+function closeFormModal() {
+    const modal = document.getElementById('formModal');
     if (modal) {
         modal.style.animation = 'fadeOut 0.2s ease forwards';
         setTimeout(() => modal.remove(), 200);
     }
 }
 
-async function handlePagamento(event, contaId) {
-    event.preventDefault();
-
-    const valorPagamento = parseFloat(document.getElementById('valor_pagamento').value);
-    const banco = document.getElementById('banco_pagamento').value;
-    const idStr = String(contaId);
-    const conta = contas.find(c => String(c.id) === idStr);
-
-    if (!conta) {
-        showMessage('Conta n?o encontrada!', 'error');
-        return;
-    }
-
-    const novoValorPago = parseFloat(conta.valor_pago || 0) + valorPagamento;
-    const valorNota = parseFloat(conta.valor_nota);
+// ============================================
+// SISTEMA DE ABAS - CORRIGIDO
+// ============================================
+window.switchFormTab = function(index) {
+    const tabButtons = document.querySelectorAll('#formModal .tab-btn');
+    const tabContents = document.querySelectorAll('#formModal .tab-content');
     
-    let novoStatus = 'PENDENTE';
-    if (novoValorPago >= valorNota) {
-        novoStatus = 'PAGO';
-    }
+    tabButtons.forEach((btn, i) => {
+        btn.classList.toggle('active', i === index);
+    });
+    
+    tabContents.forEach((content, i) => {
+        content.classList.toggle('active', i === index);
+    });
+};
 
-    const dataAtual = new Date().toISOString().split('T')[0];
+// ============================================
+// SUBMIT - CORRIGIDO
+// ============================================
+async function handleSubmit(event) {
+    if (event) event.preventDefault();
+
+    const formData = {
+        responsavel: document.getElementById('responsavel').value.trim(),
+        documento: document.getElementById('documento').value.trim(),
+        vendedor: document.getElementById('vendedor').value.trim(),
+        transportadora: document.getElementById('transportadora').value.trim(),
+        destino: document.getElementById('destino').value.trim(),
+        numeroCotacao: document.getElementById('numeroCotacao').value.trim(),
+        valorFrete: parseFloat(document.getElementById('valorFrete').value),
+        previsaoEntrega: document.getElementById('previsaoEntrega').value.trim(),
+        canalComunicacao: document.getElementById('canalComunicacao').value.trim(),
+        codigoColeta: document.getElementById('codigoColeta').value.trim(),
+        responsavelTransportadora: document.getElementById('responsavelTransportadora').value.trim(),
+        dataCotacao: document.getElementById('dataCotacao').value,
+        observacoes: document.getElementById('observacoes').value.trim(),
+        negocioFechado: false
+    };
+
+    const editId = document.getElementById('editId').value;
+
+    if (editId) {
+        const cotacaoExistente = cotacoes.find(c => String(c.id) === String(editId));
+        if (cotacaoExistente) {
+            formData.negocioFechado = cotacaoExistente.negocioFechado;
+            formData.timestamp = cotacaoExistente.timestamp;
+        }
+    }
 
     if (!isOnline) {
-        showMessage('Sistema offline. Dados n?o foram salvos.', 'error');
-        closePagamentoModal();
+        showMessage('Sistema offline. Dados não foram salvos.', 'error');
+        closeFormModal();
         return;
     }
 
     try {
-        const response = await fetch(`${API_URL}/contas/${idStr}`, {
-            method: 'PATCH',
+        const url = editId ? `${API_URL}/cotacoes/${editId}` : `${API_URL}/cotacoes`;
+        const method = editId ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method,
             headers: {
                 'Content-Type': 'application/json',
                 'X-Session-Token': sessionToken,
                 'Accept': 'application/json'
             },
-            body: JSON.stringify({
-                valor_pago: novoValorPago,
-                banco: banco,
-                data_pagamento: dataAtual,
-                status: novoStatus
-            }),
+            body: JSON.stringify(formData),
             mode: 'cors'
         });
 
-        if (!response.ok) throw new Error('Erro ao registrar pagamento');
+        if (response.status === 401) {
+            sessionStorage.removeItem('cotacoesFreteSession');
+            mostrarTelaAcessoNegado('Sua sessão expirou');
+            return;
+        }
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.details || 'Erro ao salvar');
+        }
 
         const savedData = await response.json();
-        const index = contas.findIndex(c => String(c.id) === idStr);
-        if (index !== -1) contas[index] = savedData;
+        const mappedData = mapearCotacao(savedData);
 
-        showMessage(novoStatus === 'PAGO' ? 'Pagamento completo registrado!' : 'Pagamento parcial registrado!', 'success');
-        updateDashboard();
-        filterContas();
-        closePagamentoModal();
+        if (editId) {
+            const index = cotacoes.findIndex(c => String(c.id) === String(editId));
+            if (index !== -1) cotacoes[index] = mappedData;
+            showMessage('Cotação atualizada!', 'success');
+        } else {
+            cotacoes.push(mappedData);
+            showMessage('Cotação criada!', 'success');
+        }
+
+        lastDataHash = JSON.stringify(cotacoes.map(c => c.id));
+        updateAllFilters();
+        filterCotacoes();
+        closeFormModal();
 
     } catch (error) {
         console.error('Erro:', error);
         showMessage(`Erro: ${error.message}`, 'error');
+        closeFormModal();
     }
 }
 
 // ============================================
-// TOGGLE PAGO
+// EDIÇÃO
 // ============================================
-window.togglePago = async function(id) {
+window.editCotacao = function(id) {
     const idStr = String(id);
-    const conta = contas.find(c => String(c.id) === idStr);
+    const cotacao = cotacoes.find(c => String(c.id) === idStr);
     
-    if (!conta) return;
+    if (!cotacao) {
+        showMessage('Cotação não encontrada!', 'error');
+        return;
+    }
+    
+    showFormModal(idStr);
+};
 
-    if (conta.status === 'PAGO' || parseFloat(conta.valor_pago || 0) > 0) {
-        const confirmed = await showConfirm(
-            'Deseja reverter o pagamento desta conta?',
-            {
-                title: 'Reverter Pagamento',
-                confirmText: 'Reverter',
-                cancelText: 'Cancelar',
-                type: 'warning'
-            }
-        );
+// ============================================
+// EXCLUSÃO
+// ============================================
+window.deleteCotacao = async function(id) {
+    const confirmed = await showConfirm(
+        'Tem certeza que deseja excluir esta cotação?',
+        {
+            title: 'Excluir Cotação',
+            confirmText: 'Excluir',
+            cancelText: 'Cancelar',
+            type: 'warning'
+        }
+    );
 
-        if (!confirmed) return;
+    if (!confirmed) return;
 
-        conta.status = 'PENDENTE';
-        conta.valor_pago = 0;
-        conta.data_pagamento = null;
-        conta.banco = null;
-        
-        updateDashboard();
-        filterContas();
+    const idStr = String(id);
+    const deletedCotacao = cotacoes.find(c => String(c.id) === idStr);
+    cotacoes = cotacoes.filter(c => String(c.id) !== idStr);
+    updateAllFilters();
+    filterCotacoes();
+    showMessage('Cotação excluída!', 'success');
 
-        if (isOnline) {
-            try {
-                await fetch(`${API_URL}/contas/${idStr}`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Session-Token': sessionToken,
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        status: 'PENDENTE',
-                        valor_pago: 0,
-                        data_pagamento: null,
-                        banco: null
-                    }),
-                    mode: 'cors'
-                });
-            } catch (error) {
-                console.error('Erro ao reverter:', error);
+    if (isOnline) {
+        try {
+            const response = await fetch(`${API_URL}/cotacoes/${idStr}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-Session-Token': sessionToken,
+                    'Accept': 'application/json'
+                },
+                mode: 'cors'
+            });
+
+            if (!response.ok) throw new Error('Erro ao deletar');
+        } catch (error) {
+            if (deletedCotacao) {
+                cotacoes.push(deletedCotacao);
+                updateAllFilters();
+                filterCotacoes();
+                showMessage('Erro ao excluir', 'error');
             }
         }
-    } else {
-        showPagamentoModal(conta);
     }
 };
 
 // ============================================
-// VISUALIZA??O
+// VISUALIZAÇÃO
 // ============================================
-window.viewConta = function(id) {
+window.viewCotacao = function(id) {
     const idStr = String(id);
-    const conta = contas.find(c => String(c.id) === idStr);
+    const cotacao = cotacoes.find(c => String(c.id) === idStr);
     
-    if (!conta) {
-        showMessage('Conta n?o encontrada!', 'error');
+    if (!cotacao) {
+        showMessage('Cotação não encontrada!', 'error');
         return;
     }
 
@@ -567,46 +647,45 @@ window.viewConta = function(id) {
         <div class="modal-overlay" id="viewModal">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h3 class="modal-title">Detalhes da Conta a Receber</h3>
+                    <h3 class="modal-title">Detalhes da Cotação</h3>
                 </div>
                 
                 <div class="tabs-container">
                     <div class="tabs-nav">
-                        <button class="tab-btn active" onclick="switchViewTab(0)">Dados da Nota</button>
-                        <button class="tab-btn" onclick="switchViewTab(1)">Pagamento</button>
-                        <button class="tab-btn" onclick="switchViewTab(2)">Entrega</button>
+                        <button class="tab-btn active" onclick="switchViewTab(0)">Geral</button>
+                        <button class="tab-btn" onclick="switchViewTab(1)">Transportadora</button>
+                        <button class="tab-btn" onclick="switchViewTab(2)">Detalhes</button>
                     </div>
 
-                    <div class="tab-content active" id="view-tab-nota">
+                    <div class="tab-content active" id="view-tab-geral">
                         <div class="info-section">
-                            <h4>Informa??es da Nota Fiscal</h4>
-                            <p><strong>N?mero NF:</strong> ${conta.numero_nf}</p>
-                            <p><strong>Valor da Nota:</strong> R$ ${parseFloat(conta.valor_nota).toFixed(2)}</p>
-                            <p><strong>?rg?o:</strong> ${conta.orgao}</p>
-                            <p><strong>Vendedor:</strong> ${conta.vendedor}</p>
-                            <p><strong>Data Emiss?o:</strong> ${formatDate(conta.data_emissao)}</p>
-                            <p><strong>Status:</strong> ${getStatusBadge(getStatusDinamico(conta))}</p>
+                            <h4>Informações Gerais</h4>
+                            <p><strong>Responsável:</strong> ${cotacao.responsavel}</p>
+                            <p><strong>Documento:</strong> ${cotacao.documento}</p>
+                            ${cotacao.vendedor ? `<p><strong>Vendedor:</strong> ${cotacao.vendedor}</p>` : ''}
+                            <p><strong>Status:</strong> <span class="badge ${cotacao.negocioFechado ? 'fechada' : 'aberta'}">${cotacao.negocioFechado ? 'APROVADA' : 'REPROVADA'}</span></p>
                         </div>
                     </div>
 
-                    <div class="tab-content" id="view-tab-pagamento">
+                    <div class="tab-content" id="view-tab-transportadora">
                         <div class="info-section">
-                            <h4>Informa??es de Pagamento</h4>
-                            <p><strong>Valor Pago:</strong> R$ ${parseFloat(conta.valor_pago || 0).toFixed(2)}</p>
-                            <p><strong>Valor Restante:</strong> R$ ${(parseFloat(conta.valor_nota) - parseFloat(conta.valor_pago || 0)).toFixed(2)}</p>
-                            ${conta.banco ? `<p><strong>Banco:</strong> ${conta.banco}</p>` : '<p><em>Banco n?o informado</em></p>'}
-                            ${conta.data_pagamento ? `<p><strong>Data do Pagamento:</strong> ${formatDate(conta.data_pagamento)}</p>` : '<p><em>Ainda n?o pago</em></p>'}
+                            <h4>Dados da Transportadora</h4>
+                            <p><strong>Transportadora:</strong> ${cotacao.transportadora}</p>
+                            <p><strong>Destino:</strong> ${cotacao.destino}</p>
+                            ${cotacao.numeroCotacao ? `<p><strong>Número da Cotação:</strong> ${cotacao.numeroCotacao}</p>` : ''}
+                            <p><strong>Valor do Frete:</strong> R$ ${parseFloat(cotacao.valorFrete).toFixed(2)}</p>
+                            ${cotacao.previsaoEntrega ? `<p><strong>Previsão de Entrega:</strong> ${formatDateDDMMYYYY(cotacao.previsaoEntrega)}</p>` : ''}
+                            ${cotacao.canalComunicacao ? `<p><strong>Canal de Comunicação:</strong> ${cotacao.canalComunicacao}</p>` : ''}
+                            ${cotacao.codigoColeta ? `<p><strong>Código de Coleta:</strong> ${cotacao.codigoColeta}</p>` : ''}
+                            ${cotacao.responsavelTransportadora ? `<p><strong>Responsável:</strong> ${cotacao.responsavelTransportadora}</p>` : ''}
                         </div>
                     </div>
 
-                    <div class="tab-content" id="view-tab-entrega">
+                    <div class="tab-content" id="view-tab-detalhes">
                         <div class="info-section">
-                            <h4>Dados da Entrega (Frete)</h4>
-                            ${conta.dados_frete ? `
-                                <p><strong>Transportadora:</strong> ${conta.dados_frete.transportadora || '-'}</p>
-                                <p><strong>Rastreio:</strong> ${conta.dados_frete.rastreio || '-'}</p>
-                                <p><strong>Data Entrega:</strong> ${formatDate(conta.dados_frete.data_entrega) || '-'}</p>
-                            ` : '<p><em>Dados de frete n?o dispon?veis</em></p>'}
+                            <h4>Detalhes Adicionais</h4>
+                            <p><strong>Data da Cotação:</strong> ${formatDate(cotacao.dataCotacao)}</p>
+                            ${cotacao.observacoes ? `<p><strong>Observações:</strong> ${cotacao.observacoes}</p>` : ''}
                         </div>
                     </div>
                 </div>
@@ -640,119 +719,113 @@ window.switchViewTab = function(index) {
 };
 
 // ============================================
-// FILTROS
+// FILTROS - ATUALIZAÇÃO DINÂMICA
 // ============================================
 function updateAllFilters() {
-    updateVendedoresFilter();
-    updateBancosFilter();
-    updateStatusFilter();
+    updateTransportadorasFilter();
+    updateResponsaveisFilter();
 }
 
-function updateVendedoresFilter() {
-    const vendedores = new Set();
-    contas.forEach(c => {
-        if (c.vendedor?.trim()) {
-            vendedores.add(c.vendedor.trim());
+function updateTransportadorasFilter() {
+    const transportadoras = new Set();
+    cotacoes.forEach(c => {
+        if (c.transportadora?.trim()) {
+            transportadoras.add(c.transportadora.trim());
         }
     });
 
-    const select = document.getElementById('filterVendedor');
+    const select = document.getElementById('filterTransportadora');
     if (select) {
         const currentValue = select.value;
-        select.innerHTML = '<option value="">Todos</option>';
-        Array.from(vendedores).sort().forEach(v => {
+        select.innerHTML = '<option value="">Todas</option>';
+        Array.from(transportadoras).sort().forEach(t => {
             const option = document.createElement('option');
-            option.value = v;
-            option.textContent = v;
+            option.value = t;
+            option.textContent = t;
             select.appendChild(option);
         });
         select.value = currentValue;
     }
 }
 
-function updateBancosFilter() {
-    const bancos = new Set();
-    contas.forEach(c => {
-        if (c.banco?.trim()) {
-            bancos.add(c.banco.trim());
+function updateResponsaveisFilter() {
+    const responsaveis = new Set();
+    cotacoes.forEach(c => {
+        if (c.responsavel?.trim()) {
+            responsaveis.add(c.responsavel.trim());
         }
     });
 
-    const select = document.getElementById('filterBanco');
+    const select = document.getElementById('filterResponsavel');
     if (select) {
         const currentValue = select.value;
         select.innerHTML = '<option value="">Todos</option>';
-        Array.from(bancos).sort().forEach(b => {
+        Array.from(responsaveis).sort().forEach(r => {
             const option = document.createElement('option');
-            option.value = b;
-            option.textContent = b;
+            option.value = r;
+            option.textContent = r;
             select.appendChild(option);
         });
         select.value = currentValue;
     }
 }
 
-function updateStatusFilter() {
-    const select = document.getElementById('filterStatus');
-    if (select) {
-        const currentValue = select.value;
-        select.innerHTML = `
-            <option value="">Todos</option>
-            <option value="PAGO">Pago</option>
-            <option value="VENCIDO">Vencido</option>
-            <option value="PENDENTE">Pendente</option>
-        `;
-        select.value = currentValue;
-    }
-}
-
-function filterContas() {
+// ============================================
+// FILTROS E RENDERIZAÇÃO
+// ============================================
+function filterCotacoes() {
     const searchTerm = document.getElementById('search')?.value.toLowerCase() || '';
-    const filterVendedor = document.getElementById('filterVendedor')?.value || '';
+    const filterTransportadora = document.getElementById('filterTransportadora')?.value || '';
+    const filterResponsavel = document.getElementById('filterResponsavel')?.value || '';
     const filterStatus = document.getElementById('filterStatus')?.value || '';
-    const filterBanco = document.getElementById('filterBanco')?.value || '';
     
-    let filtered = [...contas];
+    let filtered = [...cotacoes];
 
     filtered = filtered.filter(c => {
-        const dataEmissao = new Date(c.data_emissao + 'T00:00:00');
-        return dataEmissao.getMonth() === currentMonth && dataEmissao.getFullYear() === currentYear;
+        const data = new Date(c.dataCotacao + 'T00:00:00');
+        return data.getMonth() === currentMonth && data.getFullYear() === currentYear;
     });
 
-    if (filterVendedor) {
-        filtered = filtered.filter(c => c.vendedor === filterVendedor);
+    if (filterTransportadora) {
+        filtered = filtered.filter(c => c.transportadora === filterTransportadora);
     }
 
-    if (filterBanco) {
-        filtered = filtered.filter(c => c.banco === filterBanco);
+    if (filterResponsavel) {
+        filtered = filtered.filter(c => c.responsavel === filterResponsavel);
     }
 
     if (filterStatus) {
-        filtered = filtered.filter(c => getStatusDinamico(c) === filterStatus);
+        filtered = filtered.filter(c => {
+            if (filterStatus === 'aberto') return !c.negocioFechado;
+            if (filterStatus === 'fechado') return c.negocioFechado;
+            return true;
+        });
     }
 
     if (searchTerm) {
         filtered = filtered.filter(c => 
-            c.numero_nf?.toLowerCase().includes(searchTerm) ||
-            c.orgao?.toLowerCase().includes(searchTerm) ||
-            c.vendedor?.toLowerCase().includes(searchTerm)
+            c.transportadora?.toLowerCase().includes(searchTerm) ||
+            c.destino?.toLowerCase().includes(searchTerm) ||
+            c.documento?.toLowerCase().includes(searchTerm) ||
+            c.numeroCotacao?.toLowerCase().includes(searchTerm) ||
+            c.responsavel?.toLowerCase().includes(searchTerm)
         );
     }
 
-    filtered.sort((a, b) => new Date(b.data_emissao) - new Date(a.data_emissao));
-    renderContas(filtered);
+    filtered.sort((a, b) => new Date(b.dataCotacao) - new Date(a.dataCotacao));
+    renderCotacoes(filtered);
 }
 
 // ============================================
-// RENDERIZA??O
+// RENDERIZAÇÃO
 // ============================================
-function renderContas(contasToRender) {
-    const container = document.getElementById('contasContainer');
+function renderCotacoes(cotacoesToRender) {
+    const container = document.getElementById('cotacoesContainer');
     
     if (!container) return;
     
-    if (!contasToRender || contasToRender.length === 0) {
-        container.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);">Nenhuma conta encontrada</div>';
+    if (!cotacoesToRender || cotacoesToRender.length === 0) {
+        container.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);">Nenhuma cotação encontrada para este período</div>';
         return;
     }
 
@@ -761,51 +834,45 @@ function renderContas(contasToRender) {
             <table>
                 <thead>
                     <tr>
-                        <th style="width: 40px; text-align: center;">
-                            <span style="font-size: 1.1rem;">?</span>
-                        </th>
-                        <th>NF</th>
-                        <th>Valor Nota</th>
-                        <th>?rg?o</th>
-                        <th>Vendedor</th>
-                        <th>Valor Pago</th>
-                        <th>Data Pgto</th>
-                        <th>Banco</th>
+                        <th style="text-align: center; width: 60px;"> </th>
+                        <th>Data</th>
+                        <th>Transportadora</th>
+                        <th>Destino</th>
+                        <th>Documento</th>
+                        <th>Valor</th>
+                        <th>Previsão</th>
                         <th>Status</th>
-                        <th style="text-align: center;">A??es</th>
+                        <th style="text-align: center; min-width: 260px;">Ações</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${contasToRender.map(c => {
-                        const isPago = c.status === 'PAGO';
-                        const valorPago = parseFloat(c.valor_pago || 0);
-                        return `
-                        <tr class="${isPago ? 'row-pago' : ''}">
-                            <td style="text-align: center; padding: 8px;">
-                                <div class="checkbox-wrapper">
-                                    <input 
-                                        type="checkbox" 
-                                        id="check-${c.id}"
-                                        ${isPago ? 'checked' : ''}
-                                        onchange="togglePago('${c.id}')"
-                                        class="styled-checkbox"
-                                    >
-                                    <label for="check-${c.id}" class="checkbox-label-styled"></label>
-                                </div>
+                    ${cotacoesToRender.map(c => `
+                        <tr class="${c.negocioFechado ? 'fechada' : ''}">
+                            <td style="text-align: center;">
+                                <button class="check-btn ${c.negocioFechado ? 'checked' : ''}" 
+                                        onclick="toggleNegocioFechado('${c.id}')" 
+                                        title="${c.negocioFechado ? 'Marcar como reprovada' : 'Marcar como aprovada'}">
+                                        ✓
+                                </button>
                             </td>
-                            <td><strong>${c.numero_nf}</strong></td>
-                            <td><strong>R$ ${parseFloat(c.valor_nota).toFixed(2)}</strong></td>
-                            <td>${c.orgao}</td>
-                            <td>${c.vendedor}</td>
-                            <td>${valorPago > 0 ? `<strong style="color: var(--success-color);">R$ ${valorPago.toFixed(2)}</strong>` : '-'}</td>
-                            <td style="white-space: nowrap;">${c.data_pagamento ? formatDate(c.data_pagamento) : '-'}</td>
-                            <td>${c.banco || '-'}</td>
-                            <td>${getStatusBadge(getStatusDinamico(c))}</td>
-                            <td class="actions-cell" style="text-align: center; white-space: nowrap;">
-                                <button onclick="viewConta('${c.id}')" class="action-btn view" title="Ver detalhes">Ver</button>
+                            <td>${formatDate(c.dataCotacao)}</td>
+                            <td><strong>${c.transportadora}</strong></td>
+                            <td>${c.destino}</td>
+                            <td>${c.documento || 'N/A'}</td>
+                            <td><strong>R$ ${parseFloat(c.valorFrete).toFixed(2)}</strong></td>
+                            <td>${formatDateDDMMYYYY(c.previsaoEntrega)}</td>
+                            <td>
+                                <span class="badge ${c.negocioFechado ? 'fechada' : 'aberta'}">
+                                    ${c.negocioFechado ? 'APROVADA' : 'REPROVADA'}
+                                </span>
+                            </td>
+                            <td class="actions-cell" style="text-align: center;">
+                                <button onclick="viewCotacao('${c.id}')" class="action-btn view">Ver</button>
+                                <button onclick="editCotacao('${c.id}')" class="action-btn edit">Editar</button>
+                                <button onclick="deleteCotacao('${c.id}')" class="action-btn delete">Excluir</button>
                             </td>
                         </tr>
-                    `}).join('')}
+                    `).join('')}
                 </tbody>
             </table>
         </div>
@@ -823,30 +890,13 @@ function formatDate(dateString) {
     return date.toLocaleDateString('pt-BR');
 }
 
-function getStatusDinamico(conta) {
-    if (conta.status === 'PAGO') return 'PAGO';
-    
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    
-    const dataEmissao = new Date(conta.data_emissao + 'T00:00:00');
-    const prazo30 = new Date(dataEmissao);
-    prazo30.setDate(prazo30.getDate() + 30);
-    
-    if (prazo30 < hoje) return 'VENCIDO';
-    
-    return 'PENDENTE';
-}
-
-function getStatusBadge(status) {
-    const statusMap = {
-        'PAGO': { class: 'entregue', text: 'Pago' },
-        'VENCIDO': { class: 'devolvido', text: 'Vencido' },
-        'PENDENTE': { class: 'transito', text: 'Pendente' }
-    };
-    
-    const s = statusMap[status] || { class: 'transito', text: status };
-    return `<span class="badge ${s.class}">${s.text}</span>`;
+function formatDateDDMMYYYY(dateString) {
+    if (!dateString) return '-';
+    const date = new Date(dateString + 'T00:00:00');
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
 }
 
 function showMessage(message, type) {
