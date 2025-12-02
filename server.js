@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
@@ -20,7 +21,10 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Middleware de autenticação
+// Servir arquivos estáticos (Frontend) da pasta 'public'
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Middleware de autenticação para API
 const authenticate = (req, res, next) => {
     const sessionToken = req.headers['x-session-token'];
     
@@ -28,13 +32,12 @@ const authenticate = (req, res, next) => {
         return res.status(401).json({ error: 'Token de sessão não fornecido' });
     }
     
-    // Aqui você pode adicionar validação adicional do token se necessário
     req.sessionToken = sessionToken;
     next();
 };
 
 // ============================================
-// ROTAS
+// ROTAS DA API
 // ============================================
 
 // Health check
@@ -177,9 +180,14 @@ app.delete('/api/contas/:id', authenticate, async (req, res) => {
     }
 });
 
-// Rota 404
-app.use((req, res) => {
-    res.status(404).json({ error: 'Rota não encontrada' });
+// Rota raiz - redireciona para o index.html
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Rota 404 para API
+app.use('/api/*', (req, res) => {
+    res.status(404).json({ error: 'Rota da API não encontrada' });
 });
 
 // Error handler
@@ -194,5 +202,6 @@ app.use((err, req, res, next) => {
 // Iniciar servidor
 app.listen(PORT, () => {
     console.log(`🚀 API Contas a Receber rodando na porta ${PORT}`);
-    console.log(`📍 Health check: http://localhost:${PORT}/api/health`);
+    console.log(`📍 Frontend: http://localhost:${PORT}`);
+    console.log(`📍 API Health: http://localhost:${PORT}/api/health`);
 });
