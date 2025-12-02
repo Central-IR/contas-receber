@@ -4,8 +4,6 @@ package-lock.json
 
 # Environment variables
 .env
-.env.local
-.env.production
 
 # Logs
 logs/
@@ -16,12 +14,8 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
-# IDE
+# IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# Build
-dist/
-build/
