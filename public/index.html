@@ -18,8 +18,11 @@
         <div class="container">
             <div class="header">
                 <h1>Contas a Receber</h1>
-                <div id="connectionStatus" class="connection-status offline">
-                    <span class="status-dot"></span>
+                <div class="header-actions">
+                    <button onclick="toggleForm()" class="register">+ Nova Conta</button>
+                    <div id="connectionStatus" class="connection-status offline">
+                        <span class="status-dot"></span>
+                    </div>
                 </div>
             </div>
 
@@ -36,7 +39,7 @@
             <div class="dashboard-grid">
                 <div class="stat-card">
                     <div class="stat-label">Faturado</div>
-                    <div class="stat-value stat-success" id="statFaturado">R$ 0,00</div>
+                    <div class="stat-value stat-primary" id="statFaturado">R$ 0,00</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-label">Pago</div>
@@ -72,6 +75,9 @@
                         <label for="filterStatus">Status</label>
                         <select id="filterStatus" onchange="filterContas()">
                             <option value="">Todos</option>
+                            <option value="PENDENTE">Pendente</option>
+                            <option value="PAGO">Pago</option>
+                            <option value="VENCIDO">Vencido</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -91,6 +97,6 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script src="script-contas.js"></script>
 </body>
 </html>
