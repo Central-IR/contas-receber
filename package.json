@@ -1,34 +1,25 @@
 {
   "name": "contas-receber-api",
   "version": "1.0.0",
-  "description": "Sistema de Contas a Receber com Supabase e sincronização automática",
-  "main": "server-supabase.js",
+  "description": "API para gerenciamento de contas a receber",
+  "main": "server.js",
   "scripts": {
-    "start": "node server-supabase.js",
-    "dev": "nodemon server-supabase.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
-  "keywords": [
-    "contas",
-    "receber",
-    "financeiro",
-    "api",
-    "supabase"
-  ],
-  "author": "Seu Nome",
-  "license": "ISC",
+  "keywords": ["api", "contas", "receber", "financeiro"],
+  "author": "I.R. Comércio e Materiais Elétricos",
+  "license": "MIT",
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
-    "express": "^4.18.2",
-    "node-fetch": "^2.7.0"
+    "express": "^4.18.2"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
   },
   "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=8.0.0"
+    "node": ">=18.0.0"
   }
 }
