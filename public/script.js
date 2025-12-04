@@ -368,12 +368,8 @@ function showFormModal(editingId = null) {
                                     <select id="banco" required>
                                         <option value="">Selecione...</option>
                                         <option value="BANCO DO BRASIL" ${conta?.banco === 'BANCO DO BRASIL' ? 'selected' : ''}>BANCO DO BRASIL</option>
-                                        <option value="CAIXA ECONÔMICA" ${conta?.banco === 'CAIXA ECONÔMICA' ? 'selected' : ''}>CAIXA ECONÔMICA</option>
                                         <option value="BRADESCO" ${conta?.banco === 'BRADESCO' ? 'selected' : ''}>BRADESCO</option>
-                                        <option value="ITAÚ" ${conta?.banco === 'ITAÚ' ? 'selected' : ''}>ITAÚ</option>
-                                        <option value="SANTANDER" ${conta?.banco === 'SANTANDER' ? 'selected' : ''}>SANTANDER</option>
                                         <option value="SICOOB" ${conta?.banco === 'SICOOB' ? 'selected' : ''}>SICOOB</option>
-                                        <option value="OUTRO" ${conta?.banco === 'OUTRO' ? 'selected' : ''}>OUTRO</option>
                                     </select>
                                 </div>
                             </div>
