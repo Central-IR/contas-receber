@@ -53,49 +53,40 @@ window.nextMonth = function() {
 };
 
 // ============================================
-// MODAL DE CONFIRMAÇÃO PERSONALIZADO
+// MODAL DE CONFIRMAÇÃO - VERSÃO FUNCIONAL
 // ============================================
 function showConfirm(message, options = {}) {
     return new Promise((resolve) => {
+        const existingModal = document.getElementById('confirmModal');
+        if (existingModal) existingModal.remove();
+
         const { title = 'Confirmação', confirmText = 'Confirmar', cancelText = 'Cancelar', type = 'warning' } = options;
 
-        const modalHTML = `
-            <div class="modal-overlay" id="confirmModal" style="z-index: 10001;">
-                <div class="modal-content" style="max-width: 450px;">
-                    <div class="modal-header">
-                        <h3 class="modal-title">${title}</h3>
-                    </div>
-                    <p style="margin: 1.5rem 0; color: var(--text-primary); font-size: 1rem; line-height: 1.6;">${message}</p>
-                    <div class="modal-actions">
-                        <button class="secondary" id="modalCancelBtn">${cancelText}</button>
-                        <button class="${type === 'warning' ? 'danger' : 'success'}" id="modalConfirmBtn">${confirmText}</button>
-                    </div>
-                </div>
+        const overlay = document.createElement('div');
+        overlay.id = 'confirmModal';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:999999;';
+
+        const box = document.createElement('div');
+        box.style.cssText = 'background:#FFFFFF;border-radius:16px;padding:2rem;max-width:450px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.5);';
+
+        box.innerHTML = `
+            <h3 style="color:#1A1A1A;margin:0 0 1rem 0;font-size:1.25rem;">${title}</h3>
+            <p style="color:#6B7280;margin:0 0 2rem 0;">${message}</p>
+            <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
+                <button id="btnCancel" style="background:#4B5563;color:#fff;border:none;padding:12px 24px;border-radius:8px;cursor:pointer;font-size:0.95rem;font-weight:600;min-width:100px;">${cancelText}</button>
+                <button id="btnConfirm" style="background:#e70000;color:#fff;border:none;padding:12px 24px;border-radius:8px;cursor:pointer;font-size:0.95rem;font-weight:600;min-width:100px;">${confirmText}</button>
             </div>
         `;
 
-        document.body.insertAdjacentHTML('beforeend', modalHTML);
-        const modal = document.getElementById('confirmModal');
-        const confirmBtn = document.getElementById('modalConfirmBtn');
-        const cancelBtn = document.getElementById('modalCancelBtn');
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
 
-        const closeModal = (result) => {
-            modal.style.animation = 'fadeOut 0.2s ease forwards';
-            setTimeout(() => { 
-                modal.remove(); 
-                resolve(result); 
-            }, 200);
-        };
+        const btnCancel = document.getElementById('btnCancel');
+        const btnConfirm = document.getElementById('btnConfirm');
 
-        confirmBtn.addEventListener('click', () => closeModal(true));
-        cancelBtn.addEventListener('click', () => closeModal(false));
-
-        if (!document.querySelector('#modalAnimations')) {
-            const style = document.createElement('style');
-            style.id = 'modalAnimations';
-            style.textContent = `@keyframes fadeOut { to { opacity: 0; } }`;
-            document.head.appendChild(style);
-        }
+        btnCancel.onclick = () => { overlay.remove(); resolve(false); };
+        btnConfirm.onclick = () => { overlay.remove(); resolve(true); };
+        overlay.onclick = (e) => { if (e.target === overlay) { overlay.remove(); resolve(false); } };
     });
 }
 
@@ -236,6 +227,7 @@ function mapearConta(conta) {
         data_vencimento: conta.data_vencimento || '',
         data_pagamento: conta.data_pagamento || null,
         status: conta.status || 'PENDENTE',
+        tipo_nf: conta.tipo_nf || 'ENVIO',
         observacoes: conta.observacoes || '',
         created_at: conta.created_at || new Date().toISOString()
     };
@@ -244,7 +236,33 @@ function mapearConta(conta) {
 function startPolling() {
     setInterval(() => {
         if (isOnline) loadContas();
-    }, 30000); // Polling a cada 30 segundos
+    }, 30000);
+}
+
+// ============================================
+// CÁLCULO AUTOMÁTICO DE STATUS
+// ============================================
+function calcularStatus(conta) {
+    // Se for um tipo de NF especial (não é ENVIO), retorna status especial
+    if (conta.tipo_nf && conta.tipo_nf !== 'ENVIO') {
+        return 'ESPECIAL';
+    }
+    
+    // Se tem data de pagamento, está pago
+    if (conta.data_pagamento) {
+        return 'PAGO';
+    }
+    
+    // Verifica se está vencido
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const vencimento = new Date(conta.data_vencimento + 'T00:00:00');
+    
+    if (vencimento < hoje) {
+        return 'VENCIDO';
+    }
+    
+    return 'PENDENTE';
 }
 
 // ============================================
@@ -256,13 +274,16 @@ function updateDashboard() {
         return data.getMonth() === currentMonth && data.getFullYear() === currentYear;
     });
 
-    const totalFaturado = contasMesAtual.reduce((sum, c) => sum + c.valor, 0);
-    const totalPago = contasMesAtual.filter(c => c.status === 'PAGO').reduce((sum, c) => sum + c.valor, 0);
+    // Filtra apenas contas do tipo ENVIO para o dashboard
+    const contasEnvio = contasMesAtual.filter(c => !c.tipo_nf || c.tipo_nf === 'ENVIO');
+
+    const totalFaturado = contasEnvio.reduce((sum, c) => sum + c.valor, 0);
+    const totalPago = contasEnvio.filter(c => c.status === 'PAGO').reduce((sum, c) => sum + c.valor, 0);
     
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
     
-    const totalVencido = contasMesAtual
+    const totalVencido = contasEnvio
         .filter(c => {
             if (c.status === 'PAGO') return false;
             const vencimento = new Date(c.data_vencimento + 'T00:00:00');
@@ -270,7 +291,7 @@ function updateDashboard() {
         })
         .reduce((sum, c) => sum + c.valor, 0);
     
-    const totalPendente = contasMesAtual
+    const totalPendente = contasEnvio
         .filter(c => {
             if (c.status === 'PAGO') return false;
             const vencimento = new Date(c.data_vencimento + 'T00:00:00');
@@ -283,7 +304,6 @@ function updateDashboard() {
     document.getElementById('statVencido').textContent = `R$ ${totalVencido.toFixed(2).replace('.', ',')}`;
     document.getElementById('statPendente').textContent = `R$ ${totalPendente.toFixed(2).replace('.', ',')}`;
 
-    // Mostrar badges de alerta
     const badgeVencido = document.getElementById('pulseBadgeVencido');
     const badgePendente = document.getElementById('pulseBadgePendente');
     const cardVencido = document.getElementById('cardVencido');
@@ -393,19 +413,21 @@ function showFormModal(editingId = null) {
                                     <label for="data_pagamento">Data de Pagamento</label>
                                     <input type="date" id="data_pagamento" value="${conta?.data_pagamento || ''}">
                                 </div>
-                                <div class="form-group">
-                                    <label for="status">Status *</label>
-                                    <select id="status" required>
-                                        <option value="PENDENTE" ${conta?.status === 'PENDENTE' ? 'selected' : ''}>PENDENTE</option>
-                                        <option value="PAGO" ${conta?.status === 'PAGO' ? 'selected' : ''}>PAGO</option>
-                                        <option value="VENCIDO" ${conta?.status === 'VENCIDO' ? 'selected' : ''}>VENCIDO</option>
-                                    </select>
-                                </div>
                             </div>
                         </div>
 
                         <div class="tab-content" id="tab-observacoes">
                             <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="tipo_nf">Tipo de NF *</label>
+                                    <select id="tipo_nf" required>
+                                        <option value="ENVIO" ${!conta?.tipo_nf || conta?.tipo_nf === 'ENVIO' ? 'selected' : ''}>Envio</option>
+                                        <option value="CANCELADA" ${conta?.tipo_nf === 'CANCELADA' ? 'selected' : ''}>Cancelada</option>
+                                        <option value="REMESSA_AMOSTRA" ${conta?.tipo_nf === 'REMESSA_AMOSTRA' ? 'selected' : ''}>Remessa de Amostra</option>
+                                        <option value="SIMPLES_REMESSA" ${conta?.tipo_nf === 'SIMPLES_REMESSA' ? 'selected' : ''}>Simples Remessa</option>
+                                        <option value="DEVOLUCAO" ${conta?.tipo_nf === 'DEVOLUCAO' ? 'selected' : ''}>Devolução</option>
+                                    </select>
+                                </div>
                                 <div class="form-group" style="grid-column: 1 / -1;">
                                     <label for="observacoes">Observações</label>
                                     <textarea id="observacoes" rows="6">${conta?.observacoes || ''}</textarea>
@@ -425,7 +447,6 @@ function showFormModal(editingId = null) {
 
     document.body.insertAdjacentHTML('beforeend', modalHTML);
     
-    // Campos em maiúsculas
     const camposMaiusculas = ['numero_nf', 'orgao', 'observacoes'];
     camposMaiusculas.forEach(campoId => {
         const campo = document.getElementById(campoId);
@@ -437,18 +458,6 @@ function showFormModal(editingId = null) {
             });
         }
     });
-    
-    // Auto-atualizar status quando data de pagamento for preenchida
-    const dataPagamento = document.getElementById('data_pagamento');
-    const statusSelect = document.getElementById('status');
-    
-    if (dataPagamento && statusSelect) {
-        dataPagamento.addEventListener('change', () => {
-            if (dataPagamento.value) {
-                statusSelect.value = 'PAGO';
-            }
-        });
-    }
     
     setTimeout(() => document.getElementById('numero_nf')?.focus(), 100);
 }
@@ -492,9 +501,12 @@ async function handleSubmit(event) {
         data_emissao: document.getElementById('data_emissao').value,
         data_vencimento: document.getElementById('data_vencimento').value,
         data_pagamento: document.getElementById('data_pagamento').value || null,
-        status: document.getElementById('status').value,
+        tipo_nf: document.getElementById('tipo_nf').value,
         observacoes: document.getElementById('observacoes').value.trim().toUpperCase()
     };
+
+    // Calcula o status automaticamente
+    formData.status = calcularStatus(formData);
 
     const editId = document.getElementById('editId').value;
 
@@ -626,6 +638,14 @@ window.viewConta = function(id) {
         return;
     }
 
+    const tipoNfLabel = {
+        'ENVIO': 'Envio',
+        'CANCELADA': 'Cancelada',
+        'REMESSA_AMOSTRA': 'Remessa de Amostra',
+        'SIMPLES_REMESSA': 'Simples Remessa',
+        'DEVOLUCAO': 'Devolução'
+    };
+
     const modalHTML = `
         <div class="modal-overlay" id="viewModal">
             <div class="modal-content">
@@ -647,6 +667,7 @@ window.viewConta = function(id) {
                             <p><strong>Órgão:</strong> ${conta.orgao}</p>
                             <p><strong>Vendedor:</strong> ${conta.vendedor}</p>
                             <p><strong>Banco:</strong> ${conta.banco}</p>
+                            <p><strong>Tipo de NF:</strong> ${tipoNfLabel[conta.tipo_nf] || conta.tipo_nf}</p>
                             <p><strong>Status:</strong> <span class="badge status-${conta.status.toLowerCase()}">${conta.status}</span></p>
                         </div>
                     </div>
@@ -694,7 +715,7 @@ window.switchViewTab = function(index) {
     
     document.querySelectorAll('#viewModal .tab-content').forEach((content, i) => {
         content.classList.toggle('active', i === index);
-    });
+    }); 
 };
 
 // ============================================
@@ -760,28 +781,23 @@ function filterContas() {
     
     let filtered = [...contas];
 
-    // Filtro por mês
     filtered = filtered.filter(c => {
         const data = new Date(c.data_vencimento + 'T00:00:00');
         return data.getMonth() === currentMonth && data.getFullYear() === currentYear;
     });
 
-    // Filtro por vendedor
     if (filterVendedor) {
         filtered = filtered.filter(c => c.vendedor === filterVendedor);
     }
 
-    // Filtro por status
     if (filterStatus) {
         filtered = filtered.filter(c => c.status === filterStatus);
     }
 
-    // Filtro por banco
     if (filterBanco) {
         filtered = filtered.filter(c => c.banco === filterBanco);
     }
 
-    // Busca textual
     if (searchTerm) {
         filtered = filtered.filter(c => 
             c.numero_nf?.toLowerCase().includes(searchTerm) ||
@@ -827,6 +843,7 @@ function renderContas(contasToRender) {
                 <tbody>
                     ${contasToRender.map(c => {
                         const statusClass = c.status.toLowerCase();
+                        const isEspecial = c.tipo_nf && c.tipo_nf !== 'ENVIO';
                         return `
                         <tr>
                             <td><strong>${c.numero_nf}</strong></td>
@@ -837,8 +854,8 @@ function renderContas(contasToRender) {
                             <td>${formatDate(c.data_vencimento)}</td>
                             <td>${c.data_pagamento ? formatDate(c.data_pagamento) : '-'}</td>
                             <td>
-                                <span class="badge status-${statusClass}">
-                                    ${c.status}
+                                <span class="badge status-${isEspecial ? 'especial' : statusClass}">
+                                    ${isEspecial ? c.tipo_nf.replace(/_/g, ' ') : c.status}
                                 </span>
                             </td>
                             <td class="actions-cell" style="text-align: center;">
