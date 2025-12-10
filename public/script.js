@@ -23,6 +23,16 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ============================================
+// FORMATAÇÃO DE MOEDA
+// ============================================
+function formatCurrency(value) {
+    return 'R$ ' + value.toLocaleString('pt-BR', { 
+        minimumFractionDigits: 2, 
+        maximumFractionDigits: 2 
+    });
+}
+
+// ============================================
 // NAVEGAÇÃO POR MESES
 // ============================================
 function updateMonthDisplay() {
@@ -299,10 +309,10 @@ function updateDashboard() {
         })
         .reduce((sum, c) => sum + c.valor, 0);
 
-    document.getElementById('statFaturado').textContent = `R$ ${totalFaturado.toFixed(2).replace('.', ',')}`;
-    document.getElementById('statPago').textContent = `R$ ${totalPago.toFixed(2).replace('.', ',')}`;
-    document.getElementById('statVencido').textContent = `R$ ${totalVencido.toFixed(2).replace('.', ',')}`;
-    document.getElementById('statPendente').textContent = `R$ ${totalPendente.toFixed(2).replace('.', ',')}`;
+    document.getElementById('statFaturado').textContent = formatCurrency(totalFaturado);
+    document.getElementById('statPago').textContent = formatCurrency(totalPago);
+    document.getElementById('statVencido').textContent = formatCurrency(totalVencido);
+    document.getElementById('statPendente').textContent = formatCurrency(totalPendente);
 
     const badgeVencido = document.getElementById('pulseBadgeVencido');
     const badgePendente = document.getElementById('pulseBadgePendente');
@@ -675,7 +685,7 @@ window.viewConta = function(id) {
                     <div class="tab-content" id="view-tab-valores">
                         <div class="info-section">
                             <h4>Valores e Datas</h4>
-                            <p><strong>Valor:</strong> R$ ${conta.valor.toFixed(2).replace('.', ',')}</p>
+                            <p><strong>Valor:</strong> ${formatCurrency(conta.valor)}</p>
                             <p><strong>Data de Emissão:</strong> ${formatDate(conta.data_emissao)}</p>
                             <p><strong>Data de Vencimento:</strong> ${formatDate(conta.data_vencimento)}</p>
                             ${conta.data_pagamento ? `<p><strong>Data de Pagamento:</strong> ${formatDate(conta.data_pagamento)}</p>` : '<p><strong>Data de Pagamento:</strong> Não pago</p>'}
@@ -829,6 +839,7 @@ function renderContas(contasToRender) {
             <table>
                 <thead>
                     <tr>
+                        <th style="text-align: center;">Pago</th>
                         <th>NF</th>
                         <th>Órgão</th>
                         <th>Vendedor</th>
@@ -844,13 +855,25 @@ function renderContas(contasToRender) {
                     ${contasToRender.map(c => {
                         const statusClass = c.status.toLowerCase();
                         const isEspecial = c.tipo_nf && c.tipo_nf !== 'ENVIO';
+                        const isEnvio = !c.tipo_nf || c.tipo_nf === 'ENVIO';
+                        const isPago = c.status === 'PAGO';
                         return `
                         <tr>
+                            <td style="text-align: center;">
+                                ${isEnvio ? `
+                                    <input 
+                                        type="checkbox" 
+                                        ${isPago ? 'checked' : ''} 
+                                        onchange="togglePago('${c.id}')"
+                                        style="cursor: pointer; width: 18px; height: 18px;"
+                                    />
+                                ` : '-'}
+                            </td>
                             <td><strong>${c.numero_nf}</strong></td>
                             <td>${c.orgao}</td>
                             <td>${c.vendedor}</td>
                             <td>${c.banco}</td>
-                            <td><strong>R$ ${c.valor.toFixed(2).replace('.', ',')}</strong></td>
+                            <td><strong>${formatCurrency(c.valor)}</strong></td>
                             <td>${formatDate(c.data_vencimento)}</td>
                             <td>${c.data_pagamento ? formatDate(c.data_pagamento) : '-'}</td>
                             <td>
