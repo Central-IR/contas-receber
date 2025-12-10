@@ -232,7 +232,7 @@ h2 {
 }
 
 .stat-value.stat-danger {
-    color: #dc3545;
+    color: var(--warning-color);
     font-weight: 800;
 }
 
@@ -241,7 +241,7 @@ h2 {
 }
 
 .stat-value.stat-primary {
-    color: var(--primary);
+    color: #dc3545;
 }
 
 .stat-value.stat-gray {
