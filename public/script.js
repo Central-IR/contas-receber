@@ -300,24 +300,13 @@ function updateDashboard() {
             return vencimento < hoje;
         })
         .reduce((sum, c) => sum + c.valor, 0);
-    
-    const totalPendente = contasEnvio
-        .filter(c => {
-            if (c.status === 'PAGO') return false;
-            const vencimento = new Date(c.data_vencimento + 'T00:00:00');
-            return vencimento >= hoje;
-        })
-        .reduce((sum, c) => sum + c.valor, 0);
 
     document.getElementById('statFaturado').textContent = formatCurrency(totalFaturado);
     document.getElementById('statPago').textContent = formatCurrency(totalPago);
     document.getElementById('statVencido').textContent = formatCurrency(totalVencido);
-    document.getElementById('statPendente').textContent = formatCurrency(totalPendente);
 
     const badgeVencido = document.getElementById('pulseBadgeVencido');
-    const badgePendente = document.getElementById('pulseBadgePendente');
     const cardVencido = document.getElementById('cardVencido');
-    const cardPendente = document.getElementById('cardPendente');
 
     if (totalVencido > 0) {
         badgeVencido.style.display = 'flex';
@@ -325,14 +314,6 @@ function updateDashboard() {
     } else {
         badgeVencido.style.display = 'none';
         cardVencido.classList.remove('has-alert');
-    }
-
-    if (totalPendente > 0) {
-        badgePendente.style.display = 'flex';
-        cardPendente.classList.add('has-alert');
-    } else {
-        badgePendente.style.display = 'none';
-        cardPendente.classList.remove('has-alert');
     }
 }
 
@@ -839,7 +820,7 @@ function renderContas(contasToRender) {
             <table>
                 <thead>
                     <tr>
-                        <th style="text-align: center;">Pago</th>
+                        <th style="text-align: center; width: 60px;"> </th>
                         <th>NF</th>
                         <th>Órgão</th>
                         <th>Vendedor</th>
@@ -861,12 +842,11 @@ function renderContas(contasToRender) {
                         <tr>
                             <td style="text-align: center;">
                                 ${isEnvio ? `
-                                    <input 
-                                        type="checkbox" 
-                                        ${isPago ? 'checked' : ''} 
-                                        onchange="togglePago('${c.id}')"
-                                        style="cursor: pointer; width: 18px; height: 18px;"
-                                    />
+                                    <button class="check-btn ${isPago ? 'checked' : ''}" 
+                                            onclick="togglePago('${c.id}')" 
+                                            title="${isPago ? 'Marcar como não pago' : 'Marcar como pago'}">
+                                            ✓
+                                    </button>
                                 ` : '-'}
                             </td>
                             <td><strong>${c.numero_nf}</strong></td>
