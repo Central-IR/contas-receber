@@ -106,7 +106,7 @@ body {
 .container {
     max-width: 1800px;
     margin: 2rem auto;
-    padding: 0 1.5rem;
+    padding: 0 2rem 5rem 2rem; /* Espaço extra no bottom para o botão flutuante */
 }
 
 .card {
@@ -350,10 +350,10 @@ button.secondary { background: #4B5563; }
 button.small { padding: 8px 12px; font-size: 0.85rem; }
 
 .action-btn {
-    padding: 6px 10px;
-    font-size: 0.8rem;
-    margin: 0 2px;
-    min-width: 60px;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    margin: 0 4px;
+    min-width: 70px;
 }
 
 @media (max-width: 1200px) {
@@ -367,7 +367,7 @@ button.small { padding: 8px 12px; font-size: 0.85rem; }
 
 .actions-cell { 
     white-space: nowrap;
-    min-width: auto;
+    min-width: 260px;
 }
 
 .filter-section {
@@ -390,21 +390,21 @@ table {
 thead { background: var(--th-bg); }
 
 th {
-    padding: 12px 8px;
+    padding: 16px 20px;
     text-align: left;
     font-weight: 700;
     color: var(--th-color);
-    font-size: 0.75rem;
+    font-size: 0.85rem;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 1px;
     border-bottom: 1px solid var(--th-border);
     white-space: nowrap;
 }
 
 td {
-    padding: 10px 8px;
+    padding: 14px 20px;
     border-bottom: 1px solid var(--border-color);
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     color: var(--text-primary);
     word-wrap: break-word;
 }
@@ -412,6 +412,36 @@ td {
 tbody tr { background: var(--bg-card); }
 tbody tr:nth-child(even) { background: var(--table-stripe); }
 tbody tr:hover { background: var(--table-hover); }
+
+/* Botão de Checkbox */
+.check-btn {
+    background: transparent;
+    border: 2px solid var(--border-color);
+    color: transparent;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 700;
+    transition: all 0.2s ease;
+    margin: 0;
+    min-width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.check-btn:hover {
+    border-color: var(--primary);
+    background: rgba(204, 112, 0, 0.1);
+}
+
+.check-btn.checked {
+    background: var(--success-color);
+    border-color: var(--success-color);
+    color: white;
+}
 
 /* Responsividade */
 @media (max-width: 1400px) {
@@ -684,7 +714,7 @@ tbody tr:hover { background: var(--table-hover); }
 }
 
 @media (max-width: 768px) {
-    .container { padding: 0 1rem; margin: 1rem auto; }
+    .container { padding: 0 1rem 5rem 1rem; margin: 1rem auto; }
     .header { flex-direction: column; align-items: flex-start; }
     .header-actions { width: 100%; justify-content: space-between; }
     h1 { font-size: 1.5rem; }
@@ -701,6 +731,7 @@ tbody tr:hover { background: var(--table-hover); }
     .tabs-nav { flex-wrap: nowrap; }
     .tab-btn { font-size: 0.8rem; padding: 10px 15px; }
     .actions-cell { min-width: auto; }
+    .month-navigation { gap: 1rem; }
 }
 
 /* ============================================
@@ -710,8 +741,8 @@ tbody tr:hover { background: var(--table-hover); }
     position: fixed;
     bottom: 2rem;
     right: 2rem;
-    width: 60px;
-    height: 60px;
+    width: 64px;
+    height: 64px;
     border-radius: 50%;
     background: var(--btn-register);
     color: white;
@@ -719,7 +750,7 @@ tbody tr:hover { background: var(--table-hover); }
     font-weight: 300;
     border: none;
     cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 12px rgba(0, 119, 199, 0.4);
     transition: all 0.3s ease;
     z-index: 1000;
     display: flex;
@@ -727,11 +758,12 @@ tbody tr:hover { background: var(--table-hover); }
     justify-content: center;
     margin: 0;
     line-height: 1;
+    padding: 0;
 }
 
 .floating-btn:hover {
-    transform: scale(1.1) translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0, 119, 199, 0.4);
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(0, 119, 199, 0.6);
     opacity: 1;
 }
 
@@ -740,9 +772,11 @@ tbody tr:hover { background: var(--table-hover); }
 }
 
 @media (max-width: 768px) {
+    .container { padding: 0 1rem 5rem 1rem; margin: 1rem auto; }
+    
     .floating-btn {
-        width: 50px;
-        height: 50px;
+        width: 56px;
+        height: 56px;
         bottom: 1.5rem;
         right: 1.5rem;
         font-size: 1.5rem;
