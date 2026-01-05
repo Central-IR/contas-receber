@@ -528,6 +528,112 @@ tbody tr:hover { background: var(--table-hover); }
     }
 }
 
+/* ============================================
+   NOTIFICAÇÃO DE VENCIDOS
+   ============================================ */
+.notification-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999999;
+    animation: fadeIn 0.3s ease;
+}
+
+.notification-content {
+    background: var(--bg-card);
+    border-radius: 16px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    border: 3px solid #e70000;
+    overflow: hidden;
+    animation: slideInNotification 0.4s ease;
+}
+
+@keyframes slideInNotification {
+    from {
+        opacity: 0;
+        transform: translateY(-50px) scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.notification-header {
+    background: linear-gradient(135deg, #e70000 0%, #c00000 100%);
+    color: white;
+    padding: 1.5rem;
+}
+
+.notification-header h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.notification-body {
+    padding: 2rem;
+}
+
+.notification-alert-box {
+    background: #FEE;
+    border-left: 4px solid #e70000;
+    padding: 1rem;
+    margin: 1rem 0 1.5rem 0;
+    border-radius: 4px;
+}
+
+.notification-total {
+    margin: 0.5rem 0 0 0;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #e70000;
+}
+
+.notification-btn {
+    width: 100%;
+    background: #e70000;
+    color: white;
+    border: none;
+    padding: 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.notification-btn:hover {
+    background: #c00000;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(231, 0, 0, 0.3);
+}
+
+@media (max-width: 768px) {
+    .notification-content {
+        width: 95%;
+    }
+    
+    .notification-header h3 {
+        font-size: 1.2rem;
+    }
+    
+    .notification-body {
+        padding: 1.5rem;
+    }
+}
+
 /* MODAL */
 .modal-overlay {
     position: fixed;
