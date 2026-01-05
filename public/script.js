@@ -3,6 +3,7 @@
 // ============================================
 const PORTAL_URL = 'https://ir-comercio-portal-zcan.onrender.com';
 const API_URL = 'https://contas-receber-m1xw.onrender.com/api';
+const NOTIFICATION_KEY = 'contasReceberNotificationShown';
 
 let contas = [];
 let isOnline = false;
@@ -219,6 +220,7 @@ async function loadContas() {
             updateAllFilters();
             updateDashboard();
             filterContas();
+            verificarContasVencidas();
         }
     } catch (error) {
         console.error('Erro ao carregar:', error);
@@ -280,7 +282,7 @@ function calcularStatus(conta) {
 // ============================================
 function updateDashboard() {
     const contasMesAtual = contas.filter(c => {
-        const data = new Date(c.data_vencimento + 'T00:00:00');
+        const data = new Date(c.data_emissao + 'T00:00:00');
         return data.getMonth() === currentMonth && data.getFullYear() === currentYear;
     });
 
@@ -296,7 +298,7 @@ function updateDashboard() {
     const totalVencido = contasEnvio
         .filter(c => {
             if (c.status === 'PAGO') return false;
-            const vencimento = new Date(c.data_vencimento + 'T00:00:00');
+            const data = new Date(c.data_emissao + 'T00:00:00');
             return vencimento < hoje;
         })
         .reduce((sum, c) => sum + c.valor, 0);
@@ -316,6 +318,81 @@ function updateDashboard() {
         cardVencido.classList.remove('has-alert');
     }
 }
+
+function verificarContasVencidas() {
+    // Verifica se já mostrou notificação nesta sessão
+    const jaExibiu = sessionStorage.getItem(NOTIFICATION_KEY);
+    if (jaExibiu) return;
+
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    
+    const contasVencidas = contas.filter(c => {
+        // Apenas contas do tipo ENVIO
+        if (c.tipo_nf && c.tipo_nf !== 'ENVIO') return false;
+        // Apenas contas não pagas
+        if (c.status === 'PAGO') return false;
+        // Verifica vencimento
+        const vencimento = new Date(c.data_vencimento + 'T00:00:00');
+        return vencimento < hoje;
+    });
+
+    if (contasVencidas.length > 0) {
+        mostrarNotificacaoVencidos(contasVencidas);
+        sessionStorage.setItem(NOTIFICATION_KEY, 'true');
+    }
+}
+
+function mostrarNotificacaoVencidos(contas) {
+    const totalVencido = contas.reduce((sum, c) => sum + c.valor, 0);
+    
+    const modalHTML = `
+        <div class="modal-overlay" id="notificationModal" style="z-index: 999999;">
+            <div class="modal-content" style="max-width: 500px; border: 3px solid #e70000;">
+                <div class="modal-header" style="background: linear-gradient(135deg, #e70000 0%, #c00000 100%); color: white; padding: 1.5rem;">
+                    <h3 class="modal-title" style="margin: 0; font-size: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                        <span style="font-size: 2rem;">⚠️</span>
+                        Atenção: Contas Vencidas
+                    </h3>
+                </div>
+                
+                <div style="padding: 2rem;">
+                    <p style="color: #1A1A1A; font-size: 1.1rem; margin-bottom: 1rem;">
+                        Você possui <strong style="color: #e70000;">${contas.length} ${contas.length === 1 ? 'conta vencida' : 'contas vencidas'}</strong>
+                    </p>
+                    
+                    <div style="background: #FEE; border-left: 4px solid #e70000; padding: 1rem; margin-bottom: 1.5rem; border-radius: 4px;">
+                        <p style="margin: 0; color: #6B7280;">
+                            <strong>Total vencido:</strong>
+                        </p>
+                        <p style="margin: 0.5rem 0 0 0; font-size: 1.5rem; font-weight: bold; color: #e70000;">
+                            ${formatCurrency(totalVencido)}
+                        </p>
+                    </div>
+                    
+                    <p style="color: #6B7280; font-size: 0.95rem; margin-bottom: 1.5rem;">
+                        Esta notificação é exibida apenas no primeiro acesso.
+                    </p>
+                    
+                    <button onclick="fecharNotificacaoVencidos()" 
+                            style="width: 100%; background: #e70000; color: white; border: none; padding: 14px; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600;">
+                        Entendi
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+}
+
+window.fecharNotificacaoVencidos = function() {
+    const modal = document.getElementById('notificationModal');
+    if (modal) {
+        modal.style.animation = 'fadeOut 0.2s ease forwards';
+        setTimeout(() => modal.remove(), 200);
+    }
+};
 
 // ============================================
 // FORMULÁRIO
@@ -371,7 +448,6 @@ function showFormModal(editingId = null) {
                                         <option value="ROBERTO" ${conta?.vendedor === 'ROBERTO' ? 'selected' : ''}>ROBERTO</option>
                                         <option value="ISAQUE" ${conta?.vendedor === 'ISAQUE' ? 'selected' : ''}>ISAQUE</option>
                                         <option value="MIGUEL" ${conta?.vendedor === 'MIGUEL' ? 'selected' : ''}>MIGUEL</option>
-                                        <option value="GUSTAVO" ${conta?.vendedor === 'GUSTAVO' ? 'selected' : ''}>GUSTAVO</option>
                                     </select>
                                 </div>
                                 <div class="form-group">
