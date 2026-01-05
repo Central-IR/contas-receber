@@ -849,9 +849,9 @@ function filterContas() {
     let filtered = [...contas];
 
     filtered = filtered.filter(c => {
-        const data = new Date(c.data_vencimento + 'T00:00:00');
-        return data.getMonth() === currentMonth && data.getFullYear() === currentYear;
-    });
+    const data = new Date(c.data_emissao + 'T00:00:00');
+    return data.getMonth() === currentMonth && data.getFullYear() === currentYear;
+});
 
     if (filterVendedor) {
         filtered = filtered.filter(c => c.vendedor === filterVendedor);
@@ -874,7 +874,12 @@ function filterContas() {
         );
     }
 
-    filtered.sort((a, b) => new Date(b.data_vencimento) - new Date(a.data_vencimento));
+    // Ordena por número da NF em ordem DECRESCENTE (maior primeiro)
+filtered.sort((a, b) => {
+    const numA = parseInt(a.numero_nf.replace(/\D/g, '')) || 0;
+    const numB = parseInt(b.numero_nf.replace(/\D/g, '')) || 0;
+    return numB - numA;
+});
     renderContas(filtered);
 }
 
