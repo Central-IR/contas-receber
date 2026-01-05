@@ -298,8 +298,8 @@ function updateDashboard() {
     const totalVencido = contasEnvio
         .filter(c => {
             if (c.status === 'PAGO') return false;
-            const data = new Date(c.data_emissao + 'T00:00:00');
-            return vencimento < hoje;
+            const dataVencimento = new Date(c.data_vencimento + 'T00:00:00');
+            return dataVencimento < hoje;
         })
         .reduce((sum, c) => sum + c.valor, 0);
 
