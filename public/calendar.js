@@ -1,62 +1,91 @@
 // ============================================
-// CALENDAR.JS - SELETOR DE MÊS E ANO
+// CALENDAR MODAL FUNCTIONALITY
 // ============================================
 
 let calendarYear = new Date().getFullYear();
 
-const mesesNomes = [
-    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-];
-
-window.openCalendar = function() {
+function toggleCalendar() {
     const modal = document.getElementById('calendarModal');
-    if (modal) {
-        modal.classList.add('show');
-        renderCalendar();
-    }
-};
-
-window.closeCalendar = function() {
-    const modal = document.getElementById('calendarModal');
-    if (modal) {
+    if (modal.classList.contains('show')) {
         modal.classList.remove('show');
+    } else {
+        calendarYear = currentMonth.getFullYear();
+        renderCalendar();
+        modal.classList.add('show');
     }
-};
-
-window.changeCalendarYear = function(direction) {
-    calendarYear += direction;
-    document.getElementById('calendarYear').textContent = calendarYear;
-    renderCalendar();
-};
-
-function renderCalendar() {
-    const container = document.getElementById('calendarMonths');
-    if (!container) return;
-
-    let html = '';
-    for (let i = 0; i < 12; i++) {
-        const isCurrent = i === currentMonth && calendarYear === currentYear;
-        html += `
-            <div class="calendar-month ${isCurrent ? 'current' : ''}" onclick="selectMonth(${i}, ${calendarYear})">
-                ${mesesNomes[i]}
-            </div>
-        `;
-    }
-    container.innerHTML = html;
 }
 
-window.selectMonth = function(month, year) {
-    currentMonth = month;
-    currentYear = year;
-    updateDisplay();
-    closeCalendar();
-};
+function changeCalendarYear(direction) {
+    calendarYear += direction;
+    renderCalendar();
+}
 
-// Fechar modal ao clicar fora
-document.addEventListener('click', (e) => {
+function renderCalendar() {
+    const yearElement = document.getElementById('calendarYear');
+    const monthsContainer = document.getElementById('calendarMonths');
+    
+    if (!yearElement || !monthsContainer) return;
+    
+    yearElement.textContent = calendarYear;
+    
+    const monthNames = [
+        'Janeiro', 'Fevereiro', 'Março', 'Abril', 
+        'Maio', 'Junho', 'Julho', 'Agosto', 
+        'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+    
+    monthsContainer.innerHTML = '';
+    
+    monthNames.forEach((name, index) => {
+        const monthButton = document.createElement('div');
+        monthButton.className = 'calendar-month';
+        monthButton.textContent = name;
+        
+        // Marcar o mês atual
+        if (calendarYear === currentMonth.getFullYear() && index === currentMonth.getMonth()) {
+            monthButton.classList.add('current');
+        }
+        
+        monthButton.onclick = () => selectMonth(index);
+        monthsContainer.appendChild(monthButton);
+    });
+}
+
+function selectMonth(monthIndex) {
+    currentMonth = new Date(calendarYear, monthIndex, 1);
+    updateDisplay();
+    toggleCalendar();
+}
+
+// Fechar o calendário ao clicar fora dele
+document.addEventListener('DOMContentLoaded', () => {
     const modal = document.getElementById('calendarModal');
-    if (modal && e.target === modal) {
-        closeCalendar();
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.remove('show');
+            }
+        });
     }
 });
+
+// ============================================
+// UPDATE SHOWTOAST FOR BOTTOM-RIGHT POSITION
+// ============================================
+
+// Esta função sobrescreve a original do script.js
+function showToast(message, type = 'success') {
+    const oldMessages = document.querySelectorAll('.floating-message');
+    oldMessages.forEach(msg => msg.remove());
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `floating-message ${type}`;
+    messageDiv.textContent = message;
+    
+    document.body.appendChild(messageDiv);
+    
+    setTimeout(() => {
+        messageDiv.style.animation = 'slideOutBottom 0.3s ease forwards';
+        setTimeout(() => messageDiv.remove(), 300);
+    }, 3000);
+}
