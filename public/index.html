@@ -13,10 +13,8 @@
         <div class="loader"></div>
     </div>
 
-    <!-- INTERFACE PRINCIPAL -->
-    <div class="app-content" id="mainView">
+    <div class="app-content">
         <div class="container">
-            <!-- Header -->
             <div class="header">
                 <div class="header-left">
                     <h1>Contas a Receber</h1>
@@ -24,12 +22,12 @@
                         <span class="status-dot"></span>
                     </div>
                 </div>
-                <button onclick="toggleForm()" class="btn-new-order-header">
+                <button onclick="openFormModal()" class="btn-new-order-header">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                         <line x1="12" y1="5" x2="12" y2="19"></line>
                         <line x1="5" y1="12" x2="19" y2="12"></line>
                     </svg>
-                    Registrar Conta
+                    Nova Conta
                 </button>
             </div>
 
@@ -46,27 +44,29 @@
                         <div class="stat-label">Pago</div>
                     </div>
                 </div>
-                <div class="stat-card stat-card-danger" id="cardVencido" onclick="showVencidoModal()" style="cursor: pointer;" title="Clique para ver detalhes">
+                <div class="stat-card stat-card-danger" id="cardVencido">
                     <div class="stat-icon stat-icon-danger">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                            <line x1="12" y1="9" x2="12" y2="13"></line>
-                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
                         </svg>
                     </div>
                     <div class="stat-content">
                         <div class="stat-value stat-value-danger" id="statVencido">R$ 0,00</div>
                         <div class="stat-label">Vencido</div>
+                        <div class="pulse-badge" id="pulseBadgeVencido" style="display: none;">!</div>
                     </div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-icon stat-icon-default">
+                <div class="stat-card stat-card-warning">
+                    <div class="stat-icon stat-icon-warning">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
                         </svg>
                     </div>
                     <div class="stat-content">
-                        <div class="stat-value" id="statAReceber">R$ 0,00</div>
+                        <div class="stat-value stat-value-warning" id="statAReceber">R$ 0,00</div>
                         <div class="stat-label">A Receber</div>
                     </div>
                 </div>
@@ -91,20 +91,13 @@
                         <circle cx="11" cy="11" r="8"></circle>
                         <path d="m21 21-4.35-4.35"></path>
                     </svg>
-                    <input type="text" id="search" placeholder="Pesquisar" oninput="filterContas()">
+                    <input type="text" id="search" placeholder="Pesquisar NF, órgão, vendedor..." oninput="filterContas()">
                     
+                    <!-- Filters integrated in search bar -->
                     <div class="search-bar-filters">
                         <div class="filter-dropdown-inline">
                             <select id="filterVendedor" onchange="filterContas()">
-                                <option value="">Todos Vendedores</option>
-                            </select>
-                            <svg class="dropdown-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="6 9 12 15 18 9"></polyline>
-                            </svg>
-                        </div>
-                        <div class="filter-dropdown-inline">
-                            <select id="filterBanco" onchange="filterContas()">
-                                <option value="">Todos Bancos</option>
+                                <option value="">Vendedor</option>
                             </select>
                             <svg class="dropdown-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="6 9 12 15 18 9"></polyline>
@@ -113,6 +106,16 @@
                         <div class="filter-dropdown-inline">
                             <select id="filterStatus" onchange="filterContas()">
                                 <option value="">Todos os Status</option>
+                                <option value="PAGO">Pago</option>
+                                <option value="A_RECEBER">A Receber</option>
+                            </select>
+                            <svg class="dropdown-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </div>
+                        <div class="filter-dropdown-inline">
+                            <select id="filterBanco" onchange="filterContas()">
+                                <option value="">Banco</option>
                             </select>
                             <svg class="dropdown-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="6 9 12 15 18 9"></polyline>
@@ -135,7 +138,7 @@
                         </div>
                     </div>
 
-                    <button class="calendar-btn" onclick="openCalendar()" title="Selecionar mês">
+                    <button class="calendar-btn" onclick="toggleCalendar()" title="Selecionar mês">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
                             <line x1="16" y1="2" x2="16" y2="6"></line>
@@ -143,11 +146,10 @@
                             <line x1="3" y1="10" x2="21" y2="10"></line>
                         </svg>
                     </button>
-                    <button class="calendar-btn" onclick="sincronizarDados()" title="Sincronizar">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <button class="calendar-btn" onclick="syncData()" title="Sincronizar">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="23 4 23 10 17 10"></polyline>
-                            <polyline points="1 20 1 14 7 14"></polyline>
-                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
                         </svg>
                     </button>
                 </div>
@@ -175,27 +177,165 @@
 
             <!-- Table Card -->
             <div class="card table-card">
-                <div id="contasContainer"></div>
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>NF</th>
+                                <th>Órgão</th>
+                                <th>Vendedor</th>
+                                <th>Banco</th>
+                                <th>Data Emissão</th>
+                                <th>Valor</th>
+                                <th>Status</th>
+                                <th style="text-align: center;">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="contasContainer"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- MODAL DE ALERTA VENCIDO -->
-    <div class="modal-overlay" id="vencidoModal" style="display: none;">
-        <div class="modal-content alert-modal">
-            <div class="modal-header alert-header">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2" style="flex-shrink: 0;">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                    <line x1="12" y1="9" x2="12" y2="13"></line>
-                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                </svg>
-                <h2 class="modal-title">Contas Vencidas</h2>
+    <!-- MODAL DE FORMULÁRIO -->
+    <div class="modal-overlay" id="formModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="formModalTitle">Nova Conta a Receber</h3>
+                <button class="close-modal" onclick="closeFormModal()">✕</button>
             </div>
             
-            <div class="modal-body" id="vencidoModalBody"></div>
+            <div class="tabs-container">
+                <div class="tabs-nav">
+                    <button class="tab-btn active" onclick="switchTab('tab-geral')">Geral</button>
+                    <button class="tab-btn" onclick="switchTab('tab-pagamento')">Pagamento</button>
+                </div>
+
+                <!-- TAB GERAL -->
+                <div class="tab-content active" id="tab-geral">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="numeroNF">Número NF <span class="required">*</span></label>
+                            <input type="text" id="numeroNF" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="orgao">Órgão <span class="required">*</span></label>
+                            <input type="text" id="orgao" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="vendedor">Vendedor <span class="required">*</span></label>
+                            <input type="text" id="vendedor" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="banco">Banco</label>
+                            <input type="text" id="banco">
+                        </div>
+                        <div class="form-group">
+                            <label for="dataEmissao">Data Emissão <span class="required">*</span></label>
+                            <input type="date" id="dataEmissao" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="dataVencimento">Data Vencimento</label>
+                            <input type="date" id="dataVencimento">
+                        </div>
+                        <div class="form-group">
+                            <label for="valor">Valor</label>
+                            <input type="text" id="valor" placeholder="R$ 0,00">
+                        </div>
+                        <div class="form-group">
+                            <label for="tipoNF">Tipo NF</label>
+                            <select id="tipoNF">
+                                <option value="ENVIO">ENVIO</option>
+                                <option value="RETORNO">RETORNO</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="observacoes">Observações</label>
+                        <textarea id="observacoes" rows="3"></textarea>
+                    </div>
+                </div>
+
+                <!-- TAB PAGAMENTO -->
+                <div class="tab-content" id="tab-pagamento">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="dataPagamento">Data Pagamento</label>
+                            <input type="date" id="dataPagamento">
+                        </div>
+                        <div class="form-group">
+                            <label for="status">Status <span class="required">*</span></label>
+                            <select id="status" required>
+                                <option value="A_RECEBER">A Receber</option>
+                                <option value="PAGO">Pago</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <div class="modal-actions">
-                <button type="button" onclick="closeVencidoModal()" class="btn-primary">Fechar</button>
+                <button type="button" id="btnPrevious" onclick="previousTab()" class="secondary" style="display: none;">Anterior</button>
+                <button type="button" id="btnNext" onclick="nextTab()" class="secondary">Próximo</button>
+                <button type="button" onclick="closeFormModal()" class="secondary">Cancelar</button>
+                <button type="button" id="btnSave" onclick="saveConta()" class="primary" style="display: none;">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE VISUALIZAÇÃO -->
+    <div class="modal-overlay" id="infoModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">NF Nº <span id="modalNumero"></span></h3>
+                <button class="close-modal" onclick="closeInfoModal()">✕</button>
+            </div>
+            
+            <div class="tabs-container">
+                <div class="tabs-nav">
+                    <button class="tab-btn active" onclick="switchInfoTab('info-tab-geral')">Geral</button>
+                    <button class="tab-btn" onclick="switchInfoTab('info-tab-pagamento')">Pagamento</button>
+                </div>
+
+                <div class="tab-content active" id="info-tab-geral"></div>
+                <div class="tab-content" id="info-tab-pagamento"></div>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" id="btnInfoPrevious" onclick="previousInfoTab()" class="secondary" style="display: none;">Anterior</button>
+                <button type="button" id="btnInfoNext" onclick="nextInfoTab()" class="secondary">Próximo</button>
+                <button type="button" id="btnInfoClose" onclick="closeInfoModal()" class="secondary">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE CONTAS VENCIDAS -->
+    <div class="modal-overlay" id="vencidosModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Contas Vencidas</h3>
+                <button class="close-modal" onclick="closeVencidosModal()">✕</button>
+            </div>
+            
+            <div style="overflow-x: auto; padding: 1.5rem;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>NF</th>
+                            <th>Órgão</th>
+                            <th>Data Emissão</th>
+                            <th>Data Vencimento</th>
+                            <th>Valor</th>
+                            <th style="text-align: center;">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="vencidosContainer"></tbody>
+                </table>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" onclick="closeVencidosModal()" class="secondary">Fechar</button>
             </div>
         </div>
     </div>
