@@ -21,18 +21,11 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Servir arquivos estáticos (Frontend)
+// Servir arquivos estáticos (Frontend) da pasta 'public'
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Middleware de autenticação para API
-const DEVELOPMENT_MODE = true; // Mudar para false em produção
-
 const authenticate = (req, res, next) => {
-    if (DEVELOPMENT_MODE) {
-        console.log('⚠️ MODO DESENVOLVIMENTO - Autenticação desabilitada');
-        return next();
-    }
-
     const sessionToken = req.headers['x-session-token'];
     
     if (!sessionToken) {
@@ -58,33 +51,11 @@ app.get('/api/contas', authenticate, async (req, res) => {
         const { data, error } = await supabase
             .from('contas_receber')
             .select('*')
-            .order('data_emissao', { ascending: false });
+            .order('data_vencimento', { ascending: false });
 
         if (error) throw error;
 
-        // Atualizar status baseado na data de vencimento
-        const contasAtualizadas = data.map(conta => {
-            if (conta.status === 'PAGO') return conta;
-            
-            if (conta.data_vencimento) {
-                const hoje = new Date();
-                hoje.setHours(0, 0, 0, 0);
-                const vencimento = new Date(conta.data_vencimento + 'T00:00:00');
-                vencimento.setHours(0, 0, 0, 0);
-                
-                if (vencimento < hoje) {
-                    conta.status = 'VENCIDO';
-                } else {
-                    conta.status = 'A_RECEBER';
-                }
-            } else {
-                conta.status = 'A_RECEBER';
-            }
-            
-            return conta;
-        });
-
-        res.json(contasAtualizadas || []);
+        res.json(data || []);
     } catch (error) {
         console.error('Erro ao buscar contas:', error);
         res.status(500).json({ 
@@ -127,16 +98,13 @@ app.post('/api/contas', authenticate, async (req, res) => {
         const contaData = req.body;
 
         // Validações básicas
-        if (!contaData.numero_nf || !contaData.orgao || !contaData.vendedor || !contaData.data_emissao) {
+        if (!contaData.numero_nf || !contaData.orgao || !contaData.vendedor || 
+            !contaData.banco || !contaData.valor || !contaData.data_emissao || 
+            !contaData.data_vencimento) {
             return res.status(400).json({ 
                 error: 'Campos obrigatórios faltando',
-                details: 'numero_nf, orgao, vendedor e data_emissao são obrigatórios'
+                details: 'numero_nf, orgao, vendedor, banco, valor, data_emissao e data_vencimento são obrigatórios'
             });
-        }
-
-        // Define status como A_RECEBER se não fornecido
-        if (!contaData.status) {
-            contaData.status = 'A_RECEBER';
         }
 
         const { data, error } = await supabase
@@ -163,7 +131,7 @@ app.put('/api/contas/:id', authenticate, async (req, res) => {
         const { id } = req.params;
         const contaData = req.body;
 
-        // Remove campos que não devem ser atualizados
+        // Remove o ID do body se existir
         delete contaData.id;
         delete contaData.created_at;
 
@@ -233,22 +201,7 @@ app.use((err, req, res, next) => {
 
 // Iniciar servidor
 app.listen(PORT, () => {
-    console.log('');
-    console.log('===============================================');
-    console.log('🚀 CONTAS A RECEBER');
-    console.log('===============================================');
-    console.log(`✅ Porta: ${PORT}`);
-    console.log(`✅ Supabase: ${process.env.SUPABASE_URL}`);
-    console.log('===============================================');
+    console.log(`🚀 API Contas a Receber rodando na porta ${PORT}`);
+    console.log(`📍 Frontend: http://localhost:${PORT}`);
+    console.log(`📍 API Health: http://localhost:${PORT}/api/health`);
 });
-
-process.on('unhandledRejection', (reason) => {
-    console.error('❌ Unhandled Rejection:', reason);
-});
-
-process.on('uncaughtException', (error) => {
-    console.error('❌ Uncaught Exception:', error);
-    process.exit(1);
-});
-
-module.exports = app;
