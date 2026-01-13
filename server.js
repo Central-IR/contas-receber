@@ -2,145 +2,169 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
-require('dotenv').config();
-
 const app = express();
-const PORT = process.env.PORT || 3000;
 
-// Configuração do Supabase
-const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// ============================================
-// CORS - CONFIGURAÇÃO MÁXIMA PERMISSIVIDADE
-// ============================================
-app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.header('Access-Control-Allow-Headers', '*');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Max-Age', '86400');
-    
-    // Log de requisições CORS
-    console.log(`📥 ${req.method} ${req.path} - Origin: ${req.headers.origin || 'none'}`);
-    
-    // Responder OPTIONS imediatamente
-    if (req.method === 'OPTIONS') {
-        console.log('✅ Respondendo preflight OPTIONS');
-        return res.status(200).end();
-    }
-    
-    next();
-});
+if (!supabaseUrl || !supabaseKey) {
+    console.error('❌ ERRO: SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY não configurados');
+    process.exit(1);
+}
 
-app.use(cors());
-app.use(express.json());
+const supabase = createClient(supabaseUrl, supabaseKey);
+console.log('✅ Supabase configurado:', supabaseUrl);
 
-// Servir arquivos estáticos (Frontend) da pasta 'public'
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Middleware de autenticação para API (apenas para POST, PUT, DELETE)
-const authenticate = (req, res, next) => {
-    const sessionToken = req.headers['x-session-token'];
-    
-    if (!sessionToken) {
-        return res.status(401).json({ error: 'Token de sessão não fornecido' });
-    }
-    
-    req.sessionToken = sessionToken;
-    next();
-};
-
-// ============================================
-// ROTAS DA API
-// ============================================
-
-// Health check (SEM autenticação)
-app.get('/api/health', (req, res) => {
-    console.log('✅ Health check OK');
-    res.json({ 
-        status: 'OK', 
-        timestamp: new Date().toISOString(),
-        cors: 'enabled',
-        message: 'API funcionando corretamente'
-    });
-});
-
-// GET - Listar todas as contas (SEM autenticação)
-app.get('/api/contas', async (req, res) => {
-    try {
-        console.log('📥 GET /api/contas - Listando todas as contas');
-        console.log('📋 Headers recebidos:', JSON.stringify(req.headers, null, 2));
+// CORS mais permissivo para desenvolvimento
+app.use(cors({
+    origin: function(origin, callback) {
+        // Permite requisições sem origin (mobile apps, curl, etc)
+        if (!origin) return callback(null, true);
         
+        const allowedOrigins = [
+            'https://contas-receber-mlxw.onrender.com',
+            'http://localhost:3000',
+            'http://localhost:10000',
+            'http://127.0.0.1:3000',
+            'http://127.0.0.1:10000'
+        ];
+        
+        if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('localhost')) {
+            callback(null, true);
+        } else {
+            callback(null, true); // Permitir todas as origens em desenvolvimento
+        }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-Token']
+}));
+
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+// Servir arquivos estáticos
+app.use(express.static(path.join(__dirname, 'public'), {
+    setHeaders: (res, filepath) => {
+        if (filepath.endsWith('.js')) res.setHeader('Content-Type', 'application/javascript');
+        else if (filepath.endsWith('.css')) res.setHeader('Content-Type', 'text/css');
+        else if (filepath.endsWith('.html')) res.setHeader('Content-Type', 'text/html');
+    }
+}));
+
+app.use((req, res, next) => {
+    console.log(`📥 ${new Date().toISOString()} - ${req.method} ${req.path}`);
+    next();
+});
+
+// AUTENTICAÇÃO
+const PORTAL_URL = process.env.PORTAL_URL || 'https://ir-comercio-portal-zcan.onrender.com';
+
+async function verificarAutenticacao(req, res, next) {
+    const publicPaths = ['/', '/health', '/diagnostico.html'];
+    if (publicPaths.includes(req.path)) return next();
+
+    // FORÇAR MODO DESENVOLVIMENTO - DESABILITAR PARA PRODUÇÃO
+    const DEVELOPMENT_MODE = true; // SEMPRE TRUE = SEM AUTENTICAÇÃO
+    if (DEVELOPMENT_MODE) {
+        console.log('⚠️ MODO DESENVOLVIMENTO - Autenticação desabilitada');
+        return next();
+    }
+
+    const sessionToken = req.headers['x-session-token'];
+    if (!sessionToken) {
+        console.log('❌ Token não fornecido');
+        return res.status(401).json({ error: 'Não autenticado' });
+    }
+
+    try {
+        const verifyResponse = await fetch(`${PORTAL_URL}/api/verify-session`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionToken })
+        });
+
+        if (!verifyResponse.ok) {
+            console.log('❌ Sessão inválida - Status:', verifyResponse.status);
+            return res.status(401).json({ error: 'Sessão inválida' });
+        }
+
+        const sessionData = await verifyResponse.json();
+        if (!sessionData.valid) {
+            console.log('❌ Sessão não válida');
+            return res.status(401).json({ error: 'Sessão inválida' });
+        }
+
+        req.user = sessionData.session;
+        req.sessionToken = sessionToken;
+        console.log('✅ Autenticação OK');
+        next();
+    } catch (error) {
+        console.error('❌ Erro ao verificar autenticação:', error.message);
+        return res.status(500).json({ error: 'Erro ao verificar autenticação', details: error.message });
+    }
+}
+
+// ROTAS DA API
+app.get('/api/contas', verificarAutenticacao, async (req, res) => {
+    try {
+        console.log('📋 Listando contas...');
         const { data, error } = await supabase
             .from('contas_receber')
             .select('*')
-            .order('data_vencimento', { ascending: false });
+            .order('created_at', { ascending: false });
 
         if (error) {
-            console.error('❌ Erro do Supabase:', error);
+            console.error('❌ Erro Supabase ao listar:', error);
+            throw error;
+        }
+        
+        console.log(`✅ ${data?.length || 0} contas encontradas`);
+        res.json(data || []);
+    } catch (error) {
+        console.error('❌ Erro ao listar contas:', error.message);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Erro ao listar contas',
+            message: error.message
+        });
+    }
+});
+
+app.get('/api/contas/:id', verificarAutenticacao, async (req, res) => {
+    try {
+        console.log(`🔍 Buscando conta ID: ${req.params.id}`);
+        const { data, error } = await supabase
+            .from('contas_receber')
+            .select('*')
+            .eq('id', req.params.id)
+            .single();
+
+        if (error) {
+            if (error.code === 'PGRST116') {
+                console.log('❌ Conta não encontrada');
+                return res.status(404).json({ success: false, error: 'Conta não encontrada' });
+            }
             throw error;
         }
 
-        console.log(`✅ ${data?.length || 0} contas retornadas`);
-        res.json(data || []);
-    } catch (error) {
-        console.error('❌ Erro ao buscar contas:', error);
-        res.status(500).json({ 
-            error: 'Erro ao buscar contas', 
-            details: error.message 
-        });
-    }
-});
-
-// GET - Buscar conta por ID (SEM autenticação)
-app.get('/api/contas/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        console.log(`📥 GET /api/contas/${id} - Buscando conta`);
-
-        const { data, error } = await supabase
-            .from('contas_receber')
-            .select('*')
-            .eq('id', id)
-            .single();
-
-        if (error) throw error;
-
-        if (!data) {
-            console.log('⚠️ Conta não encontrada');
-            return res.status(404).json({ error: 'Conta não encontrada' });
-        }
-
-        console.log(`✅ Conta encontrada: ${data.numero_nf}`);
+        console.log('✅ Conta encontrada');
         res.json(data);
     } catch (error) {
-        console.error('❌ Erro ao buscar conta:', error);
+        console.error('❌ Erro ao buscar conta:', error.message);
         res.status(500).json({ 
-            error: 'Erro ao buscar conta', 
-            details: error.message 
+            success: false, 
+            error: 'Erro ao buscar conta',
+            message: error.message
         });
     }
 });
 
-// POST - Criar nova conta (COM autenticação)
-app.post('/api/contas', authenticate, async (req, res) => {
+app.post('/api/contas', verificarAutenticacao, async (req, res) => {
     try {
+        console.log('➕ Criando nova conta...');
+        
         const contaData = req.body;
-        console.log('📥 POST /api/contas - Criando nova conta');
-
-        // Validações básicas
-        if (!contaData.numero_nf || !contaData.orgao || !contaData.vendedor || 
-            !contaData.banco || !contaData.valor || !contaData.data_emissao || 
-            !contaData.data_vencimento) {
-            console.log('⚠️ Campos obrigatórios faltando');
-            return res.status(400).json({ 
-                error: 'Campos obrigatórios faltando',
-                details: 'numero_nf, orgao, vendedor, banco, valor, data_emissao e data_vencimento são obrigatórios'
-            });
-        }
 
         const { data, error } = await supabase
             .from('contas_receber')
@@ -148,115 +172,119 @@ app.post('/api/contas', authenticate, async (req, res) => {
             .select()
             .single();
 
-        if (error) throw error;
+        if (error) {
+            console.error('❌ Erro Supabase ao inserir:', error);
+            throw error;
+        }
 
-        console.log(`✅ Conta criada: ${data.numero_nf}`);
+        console.log('✅ Conta criada com sucesso! ID:', data.id);
         res.status(201).json(data);
     } catch (error) {
         console.error('❌ Erro ao criar conta:', error);
         res.status(500).json({ 
-            error: 'Erro ao criar conta', 
-            details: error.message 
+            success: false, 
+            error: 'Erro ao criar conta',
+            message: error.message
         });
     }
 });
 
-// PUT - Atualizar conta (COM autenticação)
-app.put('/api/contas/:id', authenticate, async (req, res) => {
+app.put('/api/contas/:id', verificarAutenticacao, async (req, res) => {
     try {
-        const { id } = req.params;
+        console.log(`✏️ Atualizando conta ID: ${req.params.id}`);
+        
         const contaData = req.body;
-        console.log(`📥 PUT /api/contas/${id} - Atualizando conta`);
-
-        // Remove o ID do body se existir
-        delete contaData.id;
-        delete contaData.created_at;
+        contaData.updated_at = new Date().toISOString();
 
         const { data, error } = await supabase
             .from('contas_receber')
             .update(contaData)
-            .eq('id', id)
+            .eq('id', req.params.id)
             .select()
             .single();
 
-        if (error) throw error;
-
-        if (!data) {
-            console.log('⚠️ Conta não encontrada');
-            return res.status(404).json({ error: 'Conta não encontrada' });
+        if (error) {
+            if (error.code === 'PGRST116') {
+                return res.status(404).json({ success: false, error: 'Conta não encontrada' });
+            }
+            throw error;
         }
 
-        console.log(`✅ Conta atualizada: ${data.numero_nf}`);
+        console.log('✅ Conta atualizada com sucesso!');
         res.json(data);
     } catch (error) {
-        console.error('❌ Erro ao atualizar conta:', error);
+        console.error('❌ Erro ao atualizar conta:', error.message);
         res.status(500).json({ 
-            error: 'Erro ao atualizar conta', 
-            details: error.message 
+            success: false, 
+            error: 'Erro ao atualizar conta',
+            message: error.message
         });
     }
 });
 
-// DELETE - Excluir conta (COM autenticação)
-app.delete('/api/contas/:id', authenticate, async (req, res) => {
+app.delete('/api/contas/:id', verificarAutenticacao, async (req, res) => {
     try {
-        const { id } = req.params;
-        console.log(`📥 DELETE /api/contas/${id} - Excluindo conta`);
-
+        console.log(`🗑️ Deletando conta ID: ${req.params.id}`);
         const { error } = await supabase
             .from('contas_receber')
             .delete()
-            .eq('id', id);
+            .eq('id', req.params.id);
 
         if (error) throw error;
 
-        console.log('✅ Conta excluída com sucesso');
-        res.json({ message: 'Conta excluída com sucesso' });
+        console.log('✅ Conta deletada com sucesso!');
+        res.json({ success: true, message: 'Conta removida com sucesso' });
     } catch (error) {
-        console.error('❌ Erro ao excluir conta:', error);
+        console.error('❌ Erro ao deletar conta:', error.message);
         res.status(500).json({ 
-            error: 'Erro ao excluir conta', 
-            details: error.message 
+            success: false, 
+            error: 'Erro ao deletar conta',
+            message: error.message
         });
     }
 });
 
-// Rota raiz - redireciona para o index.html
+// ROTAS DE SAÚDE
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 app.get('/', (req, res) => {
-    console.log('📄 Servindo index.html');
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Rota 404 para API
-app.use('/api/*', (req, res) => {
-    console.log('⚠️ Rota da API não encontrada:', req.originalUrl);
-    res.status(404).json({ error: 'Rota da API não encontrada' });
-});
-
-// Error handler
+// TRATAMENTO GLOBAL DE ERROS
 app.use((err, req, res, next) => {
     console.error('❌ Erro não tratado:', err);
-    res.status(500).json({ 
-        error: 'Erro interno do servidor', 
-        details: err.message 
+    res.status(500).json({
+        success: false,
+        error: 'Erro interno do servidor',
+        message: err.message
     });
 });
 
-// Iniciar servidor
-app.listen(PORT, () => {
+// INICIAR SERVIDOR
+const PORT = process.env.PORT || 10000;
+
+app.listen(PORT, '0.0.0.0', () => {
     console.log('');
-    console.log('═══════════════════════════════════════════════');
-    console.log('🚀 API Contas a Receber RODANDO');
-    console.log('═══════════════════════════════════════════════');
-    console.log(`📍 Porta: ${PORT}`);
-    console.log(`🌐 Frontend: http://localhost:${PORT}`);
-    console.log(`🔌 API Health: http://localhost:${PORT}/api/health`);
-    console.log(`📊 API Contas: http://localhost:${PORT}/api/contas`);
-    console.log('');
-    console.log('✅ CORS TOTALMENTE ABERTO');
-    console.log('⚠️  AUTENTICAÇÃO:');
-    console.log('   GET (listar/buscar) → SEM autenticação');
-    console.log('   POST/PUT/DELETE → COM autenticação (X-Session-Token)');
-    console.log('═══════════════════════════════════════════════');
-    console.log('');
+    console.log('===============================================');
+    console.log('🚀 CONTAS A RECEBER');
+    console.log('===============================================');
+    console.log(`✅ Porta: ${PORT}`);
+    console.log(`✅ Supabase: ${supabaseUrl}`);
+    console.log(`✅ Portal: ${PORTAL_URL}`);
+    console.log('⚠️  MODO DESENVOLVIMENTO ATIVO - SEM AUTENTICAÇÃO');
+    console.log('===============================================');
 });
+
+process.on('unhandledRejection', (reason) => {
+    console.error('❌ Unhandled Rejection:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('❌ Uncaught Exception:', error);
+    process.exit(1);
+});
+
+module.exports = app;
