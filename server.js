@@ -13,32 +13,29 @@ const supabase = createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// Middlewares
-app.use(cors({
-    origin: [
-        'https://contas-receber-mlxw.onrender.com',
-        'http://localhost:3000',
-        '*'
-    ],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'X-Session-Token', 'Accept'],
-    credentials: true
-}));
-
-// Adicionar headers CORS manualmente também
+// ============================================
+// CORS - CONFIGURAÇÃO MÁXIMA PERMISSIVIDADE
+// ============================================
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, X-Session-Token, Accept');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.header('Access-Control-Allow-Headers', '*');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Max-Age', '86400');
     
-    // Responder a requisições OPTIONS (preflight)
+    // Log de requisições CORS
+    console.log(`📥 ${req.method} ${req.path} - Origin: ${req.headers.origin || 'none'}`);
+    
+    // Responder OPTIONS imediatamente
     if (req.method === 'OPTIONS') {
-        return res.sendStatus(200);
+        console.log('✅ Respondendo preflight OPTIONS');
+        return res.status(200).end();
     }
     
     next();
 });
 
+app.use(cors());
 app.use(express.json());
 
 // Servir arquivos estáticos (Frontend) da pasta 'public'
@@ -62,14 +59,20 @@ const authenticate = (req, res, next) => {
 
 // Health check (SEM autenticação)
 app.get('/api/health', (req, res) => {
-    console.log('✅ Health check');
-    res.json({ status: 'OK', timestamp: new Date().toISOString() });
+    console.log('✅ Health check OK');
+    res.json({ 
+        status: 'OK', 
+        timestamp: new Date().toISOString(),
+        cors: 'enabled',
+        message: 'API funcionando corretamente'
+    });
 });
 
-// GET - Listar todas as contas (SEM autenticação para testes)
+// GET - Listar todas as contas (SEM autenticação)
 app.get('/api/contas', async (req, res) => {
     try {
         console.log('📥 GET /api/contas - Listando todas as contas');
+        console.log('📋 Headers recebidos:', JSON.stringify(req.headers, null, 2));
         
         const { data, error } = await supabase
             .from('contas_receber')
@@ -92,7 +95,7 @@ app.get('/api/contas', async (req, res) => {
     }
 });
 
-// GET - Buscar conta por ID (SEM autenticação para testes)
+// GET - Buscar conta por ID (SEM autenticação)
 app.get('/api/contas/:id', async (req, res) => {
     try {
         const { id } = req.params;
@@ -250,6 +253,7 @@ app.listen(PORT, () => {
     console.log(`🔌 API Health: http://localhost:${PORT}/api/health`);
     console.log(`📊 API Contas: http://localhost:${PORT}/api/contas`);
     console.log('');
+    console.log('✅ CORS TOTALMENTE ABERTO');
     console.log('⚠️  AUTENTICAÇÃO:');
     console.log('   GET (listar/buscar) → SEM autenticação');
     console.log('   POST/PUT/DELETE → COM autenticação (X-Session-Token)');
