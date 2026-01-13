@@ -1,24 +1,39 @@
-// ============================================
-// CONFIGURAÇÃO
-// ============================================
-const DEVELOPMENT_MODE = false;
+const DEVELOPMENT_MODE = true;
 const PORTAL_URL = 'https://ir-comercio-portal-zcan.onrender.com';
-const API_URL = 'https://contas-receber-m1xw.onrender.com/api';
+const API_URL = 'https://contas-receber-api.onrender.com/api';
 
 let contas = [];
-let contasOffline = [];
+let currentMonth = new Date();
+let editingId = null;
+let currentTab = 0;
+let currentInfoTab = 0;
 let isOnline = false;
-let lastDataHash = '';
 let sessionToken = null;
-let currentMonth = new Date().getMonth();
-let currentYear = new Date().getFullYear();
+let lastDataHash = '';
 
-const meses = [
-    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-];
+const tabs = ['tab-geral', 'tab-pagamento'];
+const infoTabs = ['info-tab-geral', 'info-tab-pagamento'];
 
-console.log('Contas a Receber iniciado');
+console.log('🚀 Contas a Receber iniciada');
+console.log('📍 API URL:', API_URL);
+console.log('🔧 Modo desenvolvimento:', DEVELOPMENT_MODE);
+
+function toUpperCase(value) {
+    return value ? String(value).toUpperCase() : '';
+}
+
+// Converter input para maiúsculo automaticamente
+function setupUpperCaseInputs() {
+    const textInputs = document.querySelectorAll('input[type="text"]:not([readonly]), textarea');
+    textInputs.forEach(input => {
+        input.addEventListener('input', function(e) {
+            const start = this.selectionStart;
+            const end = this.selectionEnd;
+            this.value = toUpperCase(this.value);
+            this.setSelectionRange(start, end);
+        });
+    });
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     if (DEVELOPMENT_MODE) {
@@ -30,28 +45,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// ============================================
-// NAVEGAÇÃO POR MESES
-// ============================================
-function updateDisplay() {
-    const display = document.getElementById('currentMonth');
-    if (display) {
-        display.textContent = `${meses[currentMonth]} ${currentYear}`;
-    }
-    updateDashboard();
-    filterContas();
-}
-
-window.changeMonth = function(direction) {
-    const newDate = new Date(currentYear, currentMonth + direction, 1);
-    currentMonth = newDate.getMonth();
-    currentYear = newDate.getFullYear();
-    updateDisplay();
-};
-
-// ============================================
-// AUTENTICAÇÃO
-// ============================================
 function verificarAutenticacao() {
     const urlParams = new URLSearchParams(window.location.search);
     const tokenFromUrl = urlParams.get('sessionToken');
@@ -83,106 +76,19 @@ function mostrarTelaAcessoNegado(mensagem = 'NÃO AUTORIZADO') {
 }
 
 function inicializarApp() {
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-            inicializarApp();
-        });
-        return;
-    }
-    
-    carregarDadosOffline();
     updateDisplay();
     checkServerStatus();
     setInterval(checkServerStatus, 15000);
     startPolling();
+    setupUpperCaseInputs();
 }
 
-// ============================================
-// ARMAZENAMENTO OFFLINE (LocalStorage)
-// ============================================
-function salvarDadosOffline() {
-    try {
-        localStorage.setItem('contasReceberData', JSON.stringify(contas));
-        console.log('💾 Dados salvos offline');
-    } catch (error) {
-        console.error('Erro ao salvar dados offline:', error);
-    }
-}
-
-function carregarDadosOffline() {
-    try {
-        const dados = localStorage.getItem('contasReceberData');
-        if (dados) {
-            contas = JSON.parse(dados);
-            console.log(`💾 ${contas.length} contas carregadas do armazenamento offline`);
-            updateAllFilters();
-            updateDashboard();
-            filterContas();
-        }
-    } catch (error) {
-        console.error('Erro ao carregar dados offline:', error);
-    }
-}
-
-function salvarContaOffline(conta) {
-    try {
-        contasOffline = JSON.parse(localStorage.getItem('contasOfflineQueue') || '[]');
-        conta._offline = true;
-        conta._offlineId = Date.now();
-        contasOffline.push(conta);
-        localStorage.setItem('contasOfflineQueue', JSON.stringify(contasOffline));
-        console.log('💾 Conta salva na fila offline');
-    } catch (error) {
-        console.error('Erro ao salvar conta offline:', error);
-    }
-}
-
-async function sincronizarContasOffline() {
-    try {
-        contasOffline = JSON.parse(localStorage.getItem('contasOfflineQueue') || '[]');
-        if (contasOffline.length === 0) return;
-
-        console.log(`🔄 Sincronizando ${contasOffline.length} contas offline...`);
-
-        for (const conta of contasOffline) {
-            try {
-                const response = await fetch(`${API_URL}/contas`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Session-Token': sessionToken
-                    },
-                    body: JSON.stringify(conta)
-                });
-
-                if (response.ok) {
-                    contasOffline = contasOffline.filter(c => c._offlineId !== conta._offlineId);
-                }
-            } catch (error) {
-                console.error('Erro ao sincronizar conta:', error);
-            }
-        }
-
-        localStorage.setItem('contasOfflineQueue', JSON.stringify(contasOffline));
-        
-        if (contasOffline.length === 0) {
-            showToast('Dados sincronizados com sucesso', 'success');
-            await loadContas();
-        }
-    } catch (error) {
-        console.error('Erro na sincronização:', error);
-    }
-}
-
-// ============================================
-// CONEXÃO E STATUS
-// ============================================
 async function checkServerStatus() {
     try {
         const headers = {
             'Accept': 'application/json'
         };
-        
+
         if (!DEVELOPMENT_MODE && sessionToken) {
             headers['X-Session-Token'] = sessionToken;
         }
@@ -193,383 +99,682 @@ async function checkServerStatus() {
             mode: 'cors'
         });
 
-        if (!DEVELOPMENT_MODE && response.status === 401) {
-            sessionStorage.removeItem('contasReceberSession');
-            mostrarTelaAcessoNegado('Sua sessão expirou');
-            return false;
+        if (response.ok) {
+            setOnlineStatus(true);
+            const data = await response.json();
+            updateLocalData(data);
+        } else {
+            setOnlineStatus(false);
         }
-
-        const wasOffline = !isOnline;
-        isOnline = response.ok;
-        
-        if (wasOffline && isOnline) {
-            console.log('Servidor ONLINE');
-            await sincronizarContasOffline();
-            await loadContas();
-        }
-        
-        updateConnectionStatus();
-        return isOnline;
     } catch (error) {
-        isOnline = false;
-        updateConnectionStatus();
-        return false;
+        console.error('❌ Erro ao verificar status:', error);
+        setOnlineStatus(false);
     }
 }
 
-function updateConnectionStatus() {
+function setOnlineStatus(status) {
+    isOnline = status;
     const statusElement = document.getElementById('connectionStatus');
     if (statusElement) {
-        statusElement.className = isOnline ? 'connection-status online' : 'connection-status offline';
+        statusElement.className = status ? 'connection-status online' : 'connection-status offline';
     }
 }
 
-// ============================================
-// CARREGAMENTO DE DADOS
-// ============================================
-async function loadContas(showMessage = false) {
-    if (!isOnline) {
-        if (showMessage) {
-            showToast('Sistema offline. Não foi possível sincronizar.', 'error');
-        }
-        return;
-    }
-
-    try {
-        const timestamp = new Date().getTime();
-        const response = await fetch(`${API_URL}/contas?_t=${timestamp}`, {
-            method: 'GET',
-            headers: { 
-                'X-Session-Token': sessionToken,
-                'Accept': 'application/json',
-                'Cache-Control': 'no-cache'
-            },
-            mode: 'cors'
-        });
-
-        if (response.status === 401) {
-            sessionStorage.removeItem('contasReceberSession');
-            mostrarTelaAcessoNegado('Sua sessão expirou');
-            return;
-        }
-
-        if (!response.ok) {
-            if (showMessage) {
-                showToast('Erro ao sincronizar dados', 'error');
-            }
-            return;
-        }
-
-        const data = await response.json();
-        
-        contas = data;
-        lastDataHash = JSON.stringify(contas.map(c => c.id));
-        
-        salvarDadosOffline();
-        
-        console.log(`[${new Date().toLocaleTimeString()}] ${contas.length} contas carregadas`);
-        
-        updateAllFilters();
-        updateDashboard();
-        filterContas();
-        
-        if (showMessage) {
-            showToast('Dados sincronizados', 'success');
-        }
-        
-        verificarContasVencidas();
-    } catch (error) {
-        console.error('Erro ao carregar contas:', error);
-        if (showMessage) {
-            showToast('Erro ao sincronizar', 'error');
-        }
+function updateLocalData(newData) {
+    const newHash = JSON.stringify(newData);
+    if (newHash !== lastDataHash) {
+        contas = newData;
+        lastDataHash = newHash;
+        updateDisplay();
     }
 }
-
-window.sincronizarDados = async function() {
-    console.log('🔄 Sincronizando dados...');
-    
-    const syncButtons = document.querySelectorAll('button[onclick="sincronizarDados()"]');
-    syncButtons.forEach(btn => {
-        const svg = btn.querySelector('svg');
-        if (svg) {
-            svg.style.animation = 'spin 1s linear infinite';
-        }
-    });
-    
-    if (isOnline) {
-        await sincronizarContasOffline();
-    }
-    await loadContas(true);
-    
-    setTimeout(() => {
-        syncButtons.forEach(btn => {
-            const svg = btn.querySelector('svg');
-            if (svg) {
-                svg.style.animation = '';
-            }
-        });
-    }, 1000);
-};
 
 function startPolling() {
-    loadContas();
-    setInterval(() => {
-        if (isOnline) loadContas();
+    setInterval(async () => {
+        if (isOnline) {
+            await checkServerStatus();
+        }
     }, 10000);
 }
 
+// ============================================
+// DISPLAY E FILTROS
+// ============================================
 
-// ============================================
-// DASHBOARD ATUALIZADO
-// ============================================
+function updateDisplay() {
+    updateMonthDisplay();
+    updateDashboard();
+    populateFilters();
+    filterContas();
+}
+
+function updateMonthDisplay() {
+    const monthNames = [
+        'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+    
+    const monthDisplay = document.getElementById('currentMonth');
+    if (monthDisplay) {
+        monthDisplay.textContent = `${monthNames[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`;
+    }
+}
+
+function changeMonth(direction) {
+    currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + direction, 1);
+    updateDisplay();
+}
+
 function updateDashboard() {
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     
-    const contasDoMes = contas.filter(c => {
-        const dataEmissao = new Date(c.data_emissao + 'T00:00:00');
-        return dataEmissao.getMonth() === currentMonth && 
-               dataEmissao.getFullYear() === currentYear;
+    // Filtrar contas do mês atual
+    const contasMes = contas.filter(c => {
+        const dataEmissao = new Date(c.data_emissao);
+        return dataEmissao.getMonth() === currentMonth.getMonth() &&
+               dataEmissao.getFullYear() === currentMonth.getFullYear();
     });
-    
-    let totalPago = 0;
-    let totalVencido = 0;
-    let totalAReceber = 0;
-    let totalFaturado = 0;
-    let contadorVencido = 0;
-    
-    contasDoMes.forEach(c => {
-        const valor = parseFloat(c.valor) || 0;
-        totalFaturado += valor;
-        
-        if (c.status === 'PAGO') {
-            totalPago += valor;
-        } else if (c.status === 'A_RECEBER') {
-            totalAReceber += valor;
-            
-            if (c.data_vencimento) {
-                const dataVencimento = new Date(c.data_vencimento + 'T00:00:00');
-                dataVencimento.setHours(0, 0, 0, 0);
-                
-                if (dataVencimento < hoje) {
-                    totalVencido += valor;
-                    contadorVencido++;
-                }
-            }
-        }
+
+    // Calcular valores do mês
+    const totalPago = contasMes
+        .filter(c => c.status === 'PAGO')
+        .reduce((sum, c) => sum + parseFloat(c.valor || 0), 0);
+
+    const totalAReceber = contasMes
+        .filter(c => c.status === 'A_RECEBER')
+        .reduce((sum, c) => sum + parseFloat(c.valor || 0), 0);
+
+    const totalFaturado = contasMes
+        .reduce((sum, c) => sum + parseFloat(c.valor || 0), 0);
+
+    // Calcular vencidos (universal - todas as contas)
+    const contasVencidas = contas.filter(c => {
+        if (c.status === 'PAGO' || !c.data_vencimento) return false;
+        const dataVenc = new Date(c.data_vencimento);
+        dataVenc.setHours(0, 0, 0, 0);
+        return dataVenc < today;
     });
-    
-    const statPago = document.getElementById('statPago');
-    const statVencido = document.getElementById('statVencido');
-    const statAReceber = document.getElementById('statAReceber');
-    const statFaturado = document.getElementById('statFaturado');
-    
-    if (statPago) statPago.textContent = formatCurrency(totalPago);
-    if (statVencido) statVencido.textContent = formatCurrency(totalVencido);
-    if (statAReceber) statAReceber.textContent = formatCurrency(totalAReceber);
-    if (statFaturado) statFaturado.textContent = formatCurrency(totalFaturado);
-    
+
+    const totalVencido = contasVencidas.reduce((sum, c) => sum + parseFloat(c.valor || 0), 0);
+
+    // Atualizar elementos
+    document.getElementById('statPago').textContent = formatCurrency(totalPago);
+    document.getElementById('statVencido').textContent = formatCurrency(totalVencido);
+    document.getElementById('statAReceber').textContent = formatCurrency(totalAReceber);
+    document.getElementById('statFaturado').textContent = formatCurrency(totalFaturado);
+
+    // Mostrar/ocultar badge de alerta no card vencido
+    const pulseBadge = document.getElementById('pulseBadgeVencido');
     const cardVencido = document.getElementById('cardVencido');
-    if (cardVencido && contadorVencido > 0) {
-        cardVencido.classList.add('pulse-alert');
-    } else if (cardVencido) {
-        cardVencido.classList.remove('pulse-alert');
-    }
-}
-
-// ============================================
-// FILTROS
-// ============================================
-function updateAllFilters() {
-    const vendedores = new Set();
-    const bancos = new Set();
-    const status = new Set(['A_RECEBER', 'PAGO', 'VENCIDO']);
     
-    contas.forEach(c => {
-        if (c.vendedor && c.vendedor !== 'NÃO INFORMADO') vendedores.add(c.vendedor);
-        if (c.banco && c.banco !== 'NÃO INFORMADO') bancos.add(c.banco);
-    });
-    
-    updateFilterSelect('filterVendedor', Array.from(vendedores).sort(), 'Todos Vendedores');
-    updateFilterSelect('filterBanco', Array.from(bancos).sort(), 'Todos Bancos');
-    updateFilterSelect('filterStatus', Array.from(status).map(s => ({ 
-        value: s, 
-        label: s === 'A_RECEBER' ? 'A Receber' : s === 'PAGO' ? 'Pago' : 'Vencido'
-    })), 'Todos os Status');
-}
-
-function updateFilterSelect(id, options, placeholder) {
-    const select = document.getElementById(id);
-    if (!select) return;
-    
-    const currentValue = select.value;
-    select.innerHTML = `<option value="">${placeholder}</option>`;
-    
-    if (Array.isArray(options) && options.length > 0) {
-        options.forEach(opt => {
-            const value = typeof opt === 'object' ? opt.value : opt;
-            const label = typeof opt === 'object' ? opt.label : opt;
-            select.innerHTML += `<option value="${value}" ${value === currentValue ? 'selected' : ''}>${label}</option>`;
-        });
-    }
-}
-
-window.filterContas = function() {
-    const search = document.getElementById('search')?.value.toLowerCase() || '';
-    const filterVendedor = document.getElementById('filterVendedor')?.value || '';
-    const filterBanco = document.getElementById('filterBanco')?.value || '';
-    const filterStatus = document.getElementById('filterStatus')?.value || '';
-    
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    
-    const filtered = contas.filter(c => {
-        const dataEmissao = new Date(c.data_emissao + 'T00:00:00');
-        const noMes = dataEmissao.getMonth() === currentMonth && 
-                      dataEmissao.getFullYear() === currentYear;
-        
-        if (!noMes) return false;
-        
-        const matchSearch = !search || 
-            (c.numero_nf && c.numero_nf.toLowerCase().includes(search)) ||
-            (c.orgao && c.orgao.toLowerCase().includes(search)) ||
-            (c.vendedor && c.vendedor.toLowerCase().includes(search));
-        
-        const matchVendedor = !filterVendedor || c.vendedor === filterVendedor;
-        const matchBanco = !filterBanco || c.banco === filterBanco;
-        
-        let matchStatus = true;
-        if (filterStatus) {
-            if (filterStatus === 'VENCIDO') {
-                if (c.status === 'A_RECEBER' && c.data_vencimento) {
-                    const dataVencimento = new Date(c.data_vencimento + 'T00:00:00');
-                    dataVencimento.setHours(0, 0, 0, 0);
-                    matchStatus = dataVencimento < hoje;
-                } else {
-                    matchStatus = false;
-                }
-            } else {
-                matchStatus = c.status === filterStatus;
-            }
+    if (contasVencidas.length > 0) {
+        if (pulseBadge) {
+            pulseBadge.style.display = 'flex';
+            pulseBadge.textContent = contasVencidas.length;
         }
-        
-        return matchSearch && matchVendedor && matchBanco && matchStatus;
-    });
-    
-    renderContas(filtered);
-};
+        if (cardVencido) {
+            cardVencido.style.cursor = 'pointer';
+            cardVencido.onclick = () => showVencidosModal();
+        }
+    } else {
+        if (pulseBadge) pulseBadge.style.display = 'none';
+        if (cardVencido) {
+            cardVencido.style.cursor = 'default';
+            cardVencido.onclick = null;
+        }
+    }
+}
 
-// ============================================
-// RENDERIZAÇÃO DA TABELA
-// ============================================
+function populateFilters() {
+    const vendedores = [...new Set(contas.map(c => c.vendedor))].filter(Boolean).sort();
+    const bancos = [...new Set(contas.map(c => c.banco))].filter(Boolean).sort();
+
+    const filterVendedor = document.getElementById('filterVendedor');
+    const filterBanco = document.getElementById('filterBanco');
+
+    if (filterVendedor) {
+        const currentValue = filterVendedor.value;
+        filterVendedor.innerHTML = '<option value="">Vendedor</option>' +
+            vendedores.map(v => `<option value="${v}">${v}</option>`).join('');
+        filterVendedor.value = currentValue;
+    }
+
+    if (filterBanco) {
+        const currentValue = filterBanco.value;
+        filterBanco.innerHTML = '<option value="">Banco</option>' +
+            bancos.map(b => `<option value="${b}">${b}</option>`).join('');
+        filterBanco.value = currentValue;
+    }
+}
+
+function filterContas() {
+    const searchTerm = document.getElementById('search')?.value.toUpperCase() || '';
+    const vendedorFilter = document.getElementById('filterVendedor')?.value || '';
+    const statusFilter = document.getElementById('filterStatus')?.value || '';
+    const bancoFilter = document.getElementById('filterBanco')?.value || '';
+
+    // Filtrar contas do mês atual
+    const contasFiltradas = contas.filter(conta => {
+        const dataEmissao = new Date(conta.data_emissao);
+        const mesMatch = dataEmissao.getMonth() === currentMonth.getMonth() &&
+                        dataEmissao.getFullYear() === currentMonth.getFullYear();
+
+        if (!mesMatch) return false;
+
+        const searchMatch = !searchTerm ||
+            conta.numero_nf?.toUpperCase().includes(searchTerm) ||
+            conta.orgao?.toUpperCase().includes(searchTerm) ||
+            conta.vendedor?.toUpperCase().includes(searchTerm);
+
+        const vendedorMatch = !vendedorFilter || conta.vendedor === vendedorFilter;
+        const statusMatch = !statusFilter || conta.status === statusFilter;
+        const bancoMatch = !bancoFilter || conta.banco === bancoFilter;
+
+        return searchMatch && vendedorMatch && statusMatch && bancoMatch;
+    });
+
+    renderContas(contasFiltradas);
+}
+
 function renderContas(contasList) {
     const container = document.getElementById('contasContainer');
     if (!container) return;
-    
-    if (!contasList || contasList.length === 0) {
+
+    if (contasList.length === 0) {
         container.innerHTML = `
-            <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="opacity: 0.3; margin-bottom: 1rem;">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="12" y1="8" x2="12" y2="12"></line>
-                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                </svg>
-                <p style="font-size: 1.1rem; font-weight: 600; margin: 0;">Nenhuma conta encontrada</p>
-                <p style="font-size: 0.9rem; margin-top: 0.5rem;">Registre uma nova conta para começar</p>
-            </div>
+            <tr>
+                <td colspan="8" style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom: 1rem; opacity: 0.3;">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    <p>Nenhuma conta encontrada neste mês</p>
+                </td>
+            </tr>
         `;
         return;
     }
+
+    container.innerHTML = contasList.map(conta => {
+        const statusClass = conta.status === 'PAGO' ? 'status-success' : 'status-warning';
+        const statusText = conta.status === 'PAGO' ? 'PAGO' : 'A RECEBER';
+        
+        return `
+            <tr>
+                <td><strong>${conta.numero_nf}</strong></td>
+                <td>${conta.orgao}</td>
+                <td>${conta.vendedor}</td>
+                <td>${conta.banco || '-'}</td>
+                <td>${formatDate(conta.data_emissao)}</td>
+                <td><strong>${formatCurrency(conta.valor)}</strong></td>
+                <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                <td style="text-align: center;">
+                    <div class="action-buttons">
+                        <button onclick="viewConta('${conta.id}')" class="btn-action btn-view" title="Ver">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                        <button onclick="editConta('${conta.id}')" class="btn-action btn-edit" title="Editar">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                        </button>
+                        <button onclick="confirmDelete('${conta.id}')" class="btn-action btn-delete" title="Excluir">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// ============================================
+// MODAL DE FORMULÁRIO
+// ============================================
+
+function openFormModal() {
+    editingId = null;
+    currentTab = 0;
     
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
+    document.getElementById('formModalTitle').textContent = 'Nova Conta a Receber';
     
-    const table = `
-        <div style="overflow-x: auto;">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Nº NF</th>
-                        <th>Data Emissão</th>
-                        <th>Órgão</th>
-                        <th>Vendedor</th>
-                        <th>Banco</th>
-                        <th>Valor</th>
-                        <th>Status</th>
-                        <th style="text-align: center;">Ações</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${contasList.map(c => {
-                        let status = c.status || 'A_RECEBER';
-                        let badgeClass = 'badge';
-                        let badgeText = '';
-                        
-                        if (status === 'PAGO') {
-                            badgeClass += ' entregue';
-                            badgeText = 'Pago';
-                        } else if (status === 'A_RECEBER') {
-                            if (c.data_vencimento) {
-                                const dataVencimento = new Date(c.data_vencimento + 'T00:00:00');
-                                dataVencimento.setHours(0, 0, 0, 0);
-                                
-                                if (dataVencimento < hoje) {
-                                    badgeClass += ' devolvido';
-                                    badgeText = 'Vencido';
-                                } else {
-                                    badgeClass += ' transito';
-                                    badgeText = 'A Receber';
-                                }
-                            } else {
-                                badgeClass += ' transito';
-                                badgeText = 'A Receber';
-                            }
-                        }
-                        
-                        const isPago = c.status === 'PAGO';
-                        
-                        return `
-                        <tr class="${isPago ? 'row-entregue' : ''}">
-                            <td><strong>${c.numero_nf || '-'}</strong></td>
-                            <td style="white-space: nowrap;">${formatDate(c.data_emissao)}</td>
-                            <td style="max-width: 200px; word-wrap: break-word; white-space: normal;">${c.orgao || '-'}</td>
-                            <td>${c.vendedor || '-'}</td>
-                            <td>${c.banco || '-'}</td>
-                            <td><strong>R$ ${c.valor ? parseFloat(c.valor).toFixed(2) : '0,00'}</strong></td>
-                            <td><span class="${badgeClass}">${badgeText}</span></td>
-                            <td class="actions-cell" style="text-align: center; white-space: nowrap;">
-                                <button onclick="viewConta('${c.id}')" class="action-btn view" title="Ver detalhes">Ver</button>
-                                <button onclick="editConta('${c.id}')" class="action-btn edit" title="Editar">Editar</button>
-                                <button onclick="deleteConta('${c.id}')" class="action-btn delete" title="Excluir">Excluir</button>
-                            </td>
-                        </tr>
-                    `}).join('')}
-                </tbody>
-            </table>
+    // Limpar formulário
+    document.getElementById('numeroNF').value = '';
+    document.getElementById('orgao').value = '';
+    document.getElementById('vendedor').value = '';
+    document.getElementById('banco').value = '';
+    document.getElementById('dataEmissao').value = '';
+    document.getElementById('dataVencimento').value = '';
+    document.getElementById('valor').value = '';
+    document.getElementById('tipoNF').value = 'ENVIO';
+    document.getElementById('observacoes').value = '';
+    document.getElementById('dataPagamento').value = '';
+    document.getElementById('status').value = 'A_RECEBER';
+    
+    switchTab('tab-geral');
+    document.getElementById('formModal').classList.add('show');
+    setupUpperCaseInputs();
+}
+
+function closeFormModal() {
+    const confirmed = confirm('Atualização cancelada');
+    if (confirmed) {
+        document.getElementById('formModal').classList.remove('show');
+        showToast('Atualização cancelada', 'error');
+    }
+}
+
+function switchTab(tabId) {
+    tabs.forEach((tab, index) => {
+        const tabElement = document.getElementById(tab);
+        const btnElement = document.querySelector(`.tabs-nav .tab-btn:nth-child(${index + 1})`);
+        
+        if (tab === tabId) {
+            tabElement.classList.add('active');
+            btnElement.classList.add('active');
+            currentTab = index;
+        } else {
+            tabElement.classList.remove('active');
+            btnElement.classList.remove('active');
+        }
+    });
+    
+    updateModalButtons();
+}
+
+function nextTab() {
+    if (currentTab < tabs.length - 1) {
+        switchTab(tabs[currentTab + 1]);
+    }
+}
+
+function previousTab() {
+    if (currentTab > 0) {
+        switchTab(tabs[currentTab - 1]);
+    }
+}
+
+function updateModalButtons() {
+    const btnPrevious = document.getElementById('btnPrevious');
+    const btnNext = document.getElementById('btnNext');
+    const btnSave = document.getElementById('btnSave');
+    
+    if (currentTab === 0) {
+        btnPrevious.style.display = 'none';
+        btnNext.style.display = 'inline-block';
+        btnSave.style.display = 'none';
+    } else if (currentTab === tabs.length - 1) {
+        btnPrevious.style.display = 'inline-block';
+        btnNext.style.display = 'none';
+        btnSave.style.display = 'inline-block';
+    } else {
+        btnPrevious.style.display = 'inline-block';
+        btnNext.style.display = 'inline-block';
+        btnSave.style.display = 'none';
+    }
+}
+
+async function saveConta() {
+    const numeroNF = document.getElementById('numeroNF').value.trim();
+    const orgao = document.getElementById('orgao').value.trim();
+    const vendedor = document.getElementById('vendedor').value.trim();
+    const dataEmissao = document.getElementById('dataEmissao').value;
+
+    if (!numeroNF || !orgao || !vendedor || !dataEmissao) {
+        alert('Preencha todos os campos obrigatórios: NF, Órgão, Vendedor e Data Emissão');
+        return;
+    }
+
+    const valorInput = document.getElementById('valor').value.replace(/[^\d,]/g, '').replace(',', '.');
+    const valor = parseFloat(valorInput) || 0;
+
+    const contaData = {
+        numero_nf: numeroNF,
+        orgao: orgao,
+        vendedor: vendedor,
+        banco: document.getElementById('banco').value.trim() || null,
+        valor: valor,
+        data_emissao: dataEmissao,
+        data_vencimento: document.getElementById('dataVencimento').value || null,
+        data_pagamento: document.getElementById('dataPagamento').value || null,
+        status: document.getElementById('status').value,
+        tipo_nf: document.getElementById('tipoNF').value,
+        observacoes: document.getElementById('observacoes').value.trim() || null
+    };
+
+    try {
+        const headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        };
+
+        if (!DEVELOPMENT_MODE && sessionToken) {
+            headers['X-Session-Token'] = sessionToken;
+        }
+
+        const url = editingId ? `${API_URL}/contas/${editingId}` : `${API_URL}/contas`;
+        const method = editingId ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method: method,
+            headers: headers,
+            body: JSON.stringify(contaData),
+            mode: 'cors'
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const savedConta = await response.json();
+
+        if (editingId) {
+            const index = contas.findIndex(c => c.id === editingId);
+            if (index !== -1) {
+                contas[index] = savedConta;
+            }
+            showToast(`NF ${numeroNF} atualizada`, 'success');
+        } else {
+            contas.unshift(savedConta);
+            showToast(`NF ${numeroNF} registrada`, 'success');
+        }
+
+        lastDataHash = JSON.stringify(contas);
+        updateDisplay();
+        document.getElementById('formModal').classList.remove('show');
+    } catch (error) {
+        console.error('❌ Erro ao salvar:', error);
+        alert('Erro ao salvar conta. Tente novamente.');
+    }
+}
+
+async function editConta(id) {
+    const conta = contas.find(c => c.id === id);
+    if (!conta) return;
+
+    editingId = id;
+    currentTab = 0;
+
+    document.getElementById('formModalTitle').textContent = 'Editar Conta a Receber';
+    
+    document.getElementById('numeroNF').value = conta.numero_nf;
+    document.getElementById('orgao').value = conta.orgao;
+    document.getElementById('vendedor').value = conta.vendedor;
+    document.getElementById('banco').value = conta.banco || '';
+    document.getElementById('dataEmissao').value = conta.data_emissao;
+    document.getElementById('dataVencimento').value = conta.data_vencimento || '';
+    document.getElementById('valor').value = formatCurrency(conta.valor).replace('R$ ', '');
+    document.getElementById('tipoNF').value = conta.tipo_nf || 'ENVIO';
+    document.getElementById('observacoes').value = conta.observacoes || '';
+    document.getElementById('dataPagamento').value = conta.data_pagamento || '';
+    document.getElementById('status').value = conta.status || 'A_RECEBER';
+
+    switchTab('tab-geral');
+    document.getElementById('formModal').classList.add('show');
+    setupUpperCaseInputs();
+}
+
+function confirmDelete(id) {
+    const conta = contas.find(c => c.id === id);
+    if (!conta) return;
+
+    if (confirm(`Deseja excluir a NF ${conta.numero_nf}?`)) {
+        deleteConta(id, conta.numero_nf);
+    }
+}
+
+async function deleteConta(id, numeroNF) {
+    try {
+        const headers = {
+            'Accept': 'application/json'
+        };
+
+        if (!DEVELOPMENT_MODE && sessionToken) {
+            headers['X-Session-Token'] = sessionToken;
+        }
+
+        const response = await fetch(`${API_URL}/contas/${id}`, {
+            method: 'DELETE',
+            headers: headers,
+            mode: 'cors'
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        contas = contas.filter(c => c.id !== id);
+        lastDataHash = JSON.stringify(contas);
+        updateDisplay();
+        showToast(`NF ${numeroNF} excluída`, 'error');
+    } catch (error) {
+        console.error('❌ Erro ao excluir:', error);
+        alert('Erro ao excluir conta. Tente novamente.');
+    }
+}
+
+// ============================================
+// MODAL DE VISUALIZAÇÃO
+// ============================================
+
+function viewConta(id) {
+    const conta = contas.find(c => c.id === id);
+    if (!conta) return;
+
+    currentInfoTab = 0;
+
+    document.getElementById('modalNumero').textContent = conta.numero_nf;
+
+    // Tab Geral
+    document.getElementById('info-tab-geral').innerHTML = `
+        <div class="info-grid">
+            <div class="info-item">
+                <label>Número NF</label>
+                <span>${conta.numero_nf}</span>
+            </div>
+            <div class="info-item">
+                <label>Órgão</label>
+                <span>${conta.orgao}</span>
+            </div>
+            <div class="info-item">
+                <label>Vendedor</label>
+                <span>${conta.vendedor}</span>
+            </div>
+            <div class="info-item">
+                <label>Banco</label>
+                <span>${conta.banco || '-'}</span>
+            </div>
+            <div class="info-item">
+                <label>Data Emissão</label>
+                <span>${formatDate(conta.data_emissao)}</span>
+            </div>
+            <div class="info-item">
+                <label>Data Vencimento</label>
+                <span>${conta.data_vencimento ? formatDate(conta.data_vencimento) : '-'}</span>
+            </div>
+            <div class="info-item">
+                <label>Valor</label>
+                <span><strong>${formatCurrency(conta.valor)}</strong></span>
+            </div>
+            <div class="info-item">
+                <label>Tipo NF</label>
+                <span>${conta.tipo_nf || 'ENVIO'}</span>
+            </div>
+            ${conta.observacoes ? `
+            <div class="info-item" style="grid-column: 1 / -1;">
+                <label>Observações</label>
+                <span>${conta.observacoes}</span>
+            </div>
+            ` : ''}
         </div>
     `;
+
+    // Tab Pagamento
+    document.getElementById('info-tab-pagamento').innerHTML = `
+        <div class="info-grid">
+            <div class="info-item">
+                <label>Data Pagamento</label>
+                <span>${conta.data_pagamento ? formatDate(conta.data_pagamento) : '-'}</span>
+            </div>
+            <div class="info-item">
+                <label>Status</label>
+                <span class="status-badge ${conta.status === 'PAGO' ? 'status-success' : 'status-warning'}">
+                    ${conta.status === 'PAGO' ? 'PAGO' : 'A RECEBER'}
+                </span>
+            </div>
+        </div>
+    `;
+
+    switchInfoTab('info-tab-geral');
+    document.getElementById('infoModal').classList.add('show');
+}
+
+function closeInfoModal() {
+    document.getElementById('infoModal').classList.remove('show');
+}
+
+function switchInfoTab(tabId) {
+    infoTabs.forEach((tab, index) => {
+        const tabElement = document.getElementById(tab);
+        const btnElement = document.querySelector(`#infoModal .tabs-nav .tab-btn:nth-child(${index + 1})`);
+        
+        if (tab === tabId) {
+            tabElement.classList.add('active');
+            btnElement.classList.add('active');
+            currentInfoTab = index;
+        } else {
+            tabElement.classList.remove('active');
+            btnElement.classList.remove('active');
+        }
+    });
     
-    container.innerHTML = table;
+    updateInfoModalButtons();
+}
+
+function nextInfoTab() {
+    if (currentInfoTab < infoTabs.length - 1) {
+        switchInfoTab(infoTabs[currentInfoTab + 1]);
+    }
+}
+
+function previousInfoTab() {
+    if (currentInfoTab > 0) {
+        switchInfoTab(infoTabs[currentInfoTab - 1]);
+    }
+}
+
+function updateInfoModalButtons() {
+    const btnPrevious = document.getElementById('btnInfoPrevious');
+    const btnNext = document.getElementById('btnInfoNext');
+    const btnClose = document.getElementById('btnInfoClose');
+    
+    if (currentInfoTab === 0) {
+        btnPrevious.style.display = 'none';
+        btnNext.style.display = 'inline-block';
+    } else if (currentInfoTab === infoTabs.length - 1) {
+        btnPrevious.style.display = 'inline-block';
+        btnNext.style.display = 'none';
+    } else {
+        btnPrevious.style.display = 'inline-block';
+        btnNext.style.display = 'inline-block';
+    }
+}
+
+// ============================================
+// MODAL DE VENCIDOS
+// ============================================
+
+function showVencidosModal() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const contasVencidas = contas.filter(c => {
+        if (c.status === 'PAGO' || !c.data_vencimento) return false;
+        const dataVenc = new Date(c.data_vencimento);
+        dataVenc.setHours(0, 0, 0, 0);
+        return dataVenc < today;
+    });
+
+    const container = document.getElementById('vencidosContainer');
+    
+    if (contasVencidas.length === 0) {
+        container.innerHTML = `
+            <tr>
+                <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+                    Nenhuma conta vencida
+                </td>
+            </tr>
+        `;
+    } else {
+        container.innerHTML = contasVencidas.map(conta => `
+            <tr>
+                <td><strong>${conta.numero_nf}</strong></td>
+                <td>${conta.orgao}</td>
+                <td>${formatDate(conta.data_emissao)}</td>
+                <td style="color: var(--alert-color);"><strong>${formatDate(conta.data_vencimento)}</strong></td>
+                <td><strong>${formatCurrency(conta.valor)}</strong></td>
+                <td style="text-align: center;">
+                    <div class="action-buttons">
+                        <button onclick="viewConta('${conta.id}')" class="btn-action btn-view" title="Ver">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                        <button onclick="editConta('${conta.id}')" class="btn-action btn-edit" title="Editar">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    document.getElementById('vencidosModal').classList.add('show');
+}
+
+function closeVencidosModal() {
+    document.getElementById('vencidosModal').classList.remove('show');
+}
+
+// ============================================
+// SINCRONIZAÇÃO
+// ============================================
+
+async function syncData() {
+    showToast('Sincronizando...', 'info');
+    await checkServerStatus();
+    showToast('Dados sincronizados', 'success');
 }
 
 // ============================================
 // UTILIDADES
 // ============================================
+
+function formatCurrency(value) {
+    const num = parseFloat(value) || 0;
+    return `R$ ${num.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`;
+}
+
 function formatDate(dateString) {
     if (!dateString) return '-';
     const date = new Date(dateString + 'T00:00:00');
     return date.toLocaleDateString('pt-BR');
 }
 
-function formatCurrency(value) {
-    return 'R$ ' + value.toLocaleString('pt-BR', { 
-        minimumFractionDigits: 2, 
-        maximumFractionDigits: 2 
-    });
-}
-
-function showToast(message, type) {
+function showToast(message, type = 'success') {
     const oldMessages = document.querySelectorAll('.floating-message');
     oldMessages.forEach(msg => msg.remove());
     
@@ -585,162 +790,9 @@ function showToast(message, type) {
     }, 3000);
 }
 
-
-// ============================================
-// MODAL DE CONTAS VENCIDAS
-// ============================================
-function verificarContasVencidas() {
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    
-    const vencidas = contas.filter(c => {
-        if (c.status !== 'A_RECEBER') return false;
-        if (!c.data_vencimento) return false;
-        
-        const dataVencimento = new Date(c.data_vencimento + 'T00:00:00');
-        dataVencimento.setHours(0, 0, 0, 0);
-        
-        return dataVencimento < hoje;
-    });
-    
-    if (vencidas.length === 0) return;
-    
-    const alertShown = sessionStorage.getItem('vencidoAlertShown');
-    if (!alertShown) {
-        setTimeout(() => {
-            showVencidoModal();
-            sessionStorage.setItem('vencidoAlertShown', 'true');
-        }, 1000);
+// Fechar modais ao clicar fora
+document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('modal-overlay')) {
+        e.target.classList.remove('show');
     }
-}
-
-window.showVencidoModal = function() {
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    
-    const vencidas = contas.filter(c => {
-        if (c.status !== 'A_RECEBER') return false;
-        if (!c.data_vencimento) return false;
-        
-        const dataVencimento = new Date(c.data_vencimento + 'T00:00:00');
-        dataVencimento.setHours(0, 0, 0, 0);
-        
-        return dataVencimento < hoje;
-    });
-    
-    vencidas.sort((a, b) => {
-        const dataA = new Date(a.data_vencimento);
-        const dataB = new Date(b.data_vencimento);
-        return dataA - dataB;
-    });
-    
-    const modalBody = document.getElementById('vencidoModalBody');
-    if (!modalBody) return;
-    
-    if (vencidas.length === 0) {
-        modalBody.innerHTML = `
-            <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity: 0.3; margin-bottom: 1rem;">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <path d="M12 8l0 4"></path>
-                    <path d="M12 16l.01 0"></path>
-                </svg>
-                <p style="font-size: 1.1rem; font-weight: 600; margin: 0;">Nenhuma conta vencida</p>
-                <p style="font-size: 0.9rem; margin-top: 0.5rem;">Todas as contas estão em dia</p>
-            </div>
-        `;
-    } else {
-        modalBody.innerHTML = `
-            <div style="overflow-x: auto;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Nº NF</th>
-                            <th>Data Emissão</th>
-                            <th>Órgão</th>
-                            <th>Valor</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${vencidas.map(c => {
-                            return `
-                            <tr>
-                                <td><strong>${c.numero_nf || '-'}</strong></td>
-                                <td style="white-space: nowrap;">${formatDate(c.data_emissao)}</td>
-                                <td>${c.orgao || '-'}</td>
-                                <td style="white-space: nowrap; color: #EF4444; font-weight: 600;">R$ ${parseFloat(c.valor || 0).toFixed(2)}</td>
-                            </tr>
-                        `}).join('')}
-                    </tbody>
-                </table>
-            </div>
-        `;
-    }
-    
-    const modal = document.getElementById('vencidoModal');
-    if (modal) {
-        modal.style.display = 'flex';
-    }
-};
-
-window.closeVencidoModal = function() {
-    const modal = document.getElementById('vencidoModal');
-    if (modal) {
-        modal.style.display = 'none';
-    }
-};
-
-// ============================================
-// FUNÇÕES CRUD (placeholder - implementação completa segue)
-// ============================================
-window.toggleForm = function() {
-    showToast('Funcionalidade em desenvolvimento', 'success');
-};
-
-window.viewConta = function(id) {
-    const conta = contas.find(c => c.id === id);
-    if (!conta) return;
-    showToast(`Visualizando NF ${conta.numero_nf}`, 'success');
-};
-
-window.editConta = function(id) {
-    const conta = contas.find(c => c.id === id);
-    if (!conta) return;
-    showToast(`Editando NF ${conta.numero_nf}`, 'success');
-};
-
-window.deleteConta = async function(id) {
-    const conta = contas.find(c => c.id === id);
-    if (!conta) return;
-    
-    const confirmed = confirm(`Deseja realmente excluir a NF ${conta.numero_nf}?`);
-    if (!confirmed) return;
-    
-    if (isOnline) {
-        try {
-            const response = await fetch(`${API_URL}/contas/${id}`, {
-                method: 'DELETE',
-                headers: {
-                    'X-Session-Token': sessionToken
-                }
-            });
-            
-            if (response.ok) {
-                showToast(`NF ${conta.numero_nf} excluída`, 'success');
-                await loadContas();
-            } else {
-                showToast('Erro ao excluir conta', 'error');
-            }
-        } catch (error) {
-            console.error('Erro ao excluir:', error);
-            showToast('Erro ao excluir conta', 'error');
-        }
-    } else {
-        showToast('Rede indisponível no momento. Dados salvos localmente.', 'error');
-    }
-};
-
-// Limpar flag de alerta ao fechar a página
-window.addEventListener('beforeunload', () => {
-    sessionStorage.removeItem('vencidoAlertShown');
 });
