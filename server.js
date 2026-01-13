@@ -15,10 +15,30 @@ const supabase = createClient(
 
 // Middlewares
 app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'X-Session-Token', 'Accept']
+    origin: [
+        'https://contas-receber-mlxw.onrender.com',
+        'http://localhost:3000',
+        '*'
+    ],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'X-Session-Token', 'Accept'],
+    credentials: true
 }));
+
+// Adicionar headers CORS manualmente também
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, X-Session-Token, Accept');
+    
+    // Responder a requisições OPTIONS (preflight)
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    
+    next();
+});
+
 app.use(express.json());
 
 // Servir arquivos estáticos (Frontend) da pasta 'public'
