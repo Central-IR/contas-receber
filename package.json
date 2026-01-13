@@ -1,16 +1,17 @@
 {
-  "name": "ordem-compra",
+  "name": "contas-receber",
   "version": "1.0.0",
-  "description": "Sistema de Ordem de Compra",
-  "main": "index.js",
+  "description": "Sistema de Contas a Receber",
+  "main": "server.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js"
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
   "dependencies": {
     "express": "^4.18.2",
     "cors": "^2.8.5",
-    "@supabase/supabase-js": "^2.39.0"
+    "@supabase/supabase-js": "^2.39.0",
+    "dotenv": "^16.3.1"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
