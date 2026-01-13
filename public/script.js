@@ -3,7 +3,7 @@
 // ============================================
 const DEVELOPMENT_MODE = true;
 const PORTAL_URL = 'https://ir-comercio-portal-zcan.onrender.com';
-const API_URL = 'https://contas-receber.onrender.com/api'; // Ajustar para API real
+const API_URL = 'https://contas-receber-m1xw.onrender.com/api'; // Ajustar para API real
 
 let contas = [];
 let currentMonth = new Date();
