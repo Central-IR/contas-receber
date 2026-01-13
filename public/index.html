@@ -27,7 +27,7 @@
                         <line x1="12" y1="5" x2="12" y2="19"></line>
                         <line x1="5" y1="12" x2="19" y2="12"></line>
                     </svg>
-                    Nova Conta
+                    Nova NF
                 </button>
             </div>
 
@@ -44,7 +44,7 @@
                         <div class="stat-label">Pago</div>
                     </div>
                 </div>
-                <div class="stat-card stat-card-danger" id="cardVencido">
+                <div class="stat-card stat-card-alert" id="cardVencido">
                     <div class="stat-icon stat-icon-danger">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="10"></circle>
@@ -108,6 +108,7 @@
                                 <option value="">Todos os Status</option>
                                 <option value="PAGO">Pago</option>
                                 <option value="A_RECEBER">A Receber</option>
+                                <option value="VENCIDO">Vencido</option>
                             </select>
                             <svg class="dropdown-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="6 9 12 15 18 9"></polyline>
@@ -198,89 +199,62 @@
         </div>
     </div>
 
-    <!-- MODAL DE FORMULÁRIO -->
+    <!-- MODAL DE FORMULÁRIO (NOVA/EDITAR) -->
     <div class="modal-overlay" id="formModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 class="modal-title" id="formModalTitle">Nova Conta a Receber</h3>
+                <h3 class="modal-title" id="formModalTitle">Nova NF</h3>
                 <button class="close-modal" onclick="closeFormModal()">✕</button>
             </div>
             
-            <div class="tabs-container">
-                <div class="tabs-nav">
-                    <button class="tab-btn active" onclick="switchTab('tab-geral')">Geral</button>
-                    <button class="tab-btn" onclick="switchTab('tab-pagamento')">Pagamento</button>
-                </div>
-
-                <!-- TAB GERAL -->
-                <div class="tab-content active" id="tab-geral">
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="numeroNF">Número NF <span class="required">*</span></label>
-                            <input type="text" id="numeroNF" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="orgao">Órgão <span class="required">*</span></label>
-                            <input type="text" id="orgao" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="vendedor">Vendedor <span class="required">*</span></label>
-                            <input type="text" id="vendedor" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="banco">Banco</label>
-                            <input type="text" id="banco">
-                        </div>
-                        <div class="form-group">
-                            <label for="dataEmissao">Data Emissão <span class="required">*</span></label>
-                            <input type="date" id="dataEmissao" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="dataVencimento">Data Vencimento</label>
-                            <input type="date" id="dataVencimento">
-                        </div>
-                        <div class="form-group">
-                            <label for="valor">Valor</label>
-                            <input type="text" id="valor" placeholder="R$ 0,00">
-                        </div>
-                        <div class="form-group">
-                            <label for="tipoNF">Tipo NF</label>
-                            <select id="tipoNF">
-                                <option value="ENVIO">ENVIO</option>
-                                <option value="RETORNO">RETORNO</option>
-                            </select>
-                        </div>
+            <form id="contaForm" onsubmit="saveConta(event)">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="numeroNf">Número NF *</label>
+                        <input type="text" id="numeroNf" required>
                     </div>
                     <div class="form-group">
+                        <label for="orgao">Órgão *</label>
+                        <input type="text" id="orgao" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="vendedor">Vendedor *</label>
+                        <input type="text" id="vendedor" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="banco">Banco</label>
+                        <input type="text" id="banco">
+                    </div>
+                    <div class="form-group">
+                        <label for="dataEmissao">Data Emissão *</label>
+                        <input type="date" id="dataEmissao" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="dataVencimento">Data Vencimento</label>
+                        <input type="date" id="dataVencimento">
+                    </div>
+                    <div class="form-group">
+                        <label for="valor">Valor</label>
+                        <input type="text" id="valor" placeholder="R$ 0,00">
+                    </div>
+                    <div class="form-group">
+                        <label for="tipoNf">Tipo NF *</label>
+                        <select id="tipoNf" required>
+                            <option value="ENVIO">Envio</option>
+                            <option value="RETORNO">Retorno</option>
+                        </select>
+                    </div>
+                    <div class="form-group full-width">
                         <label for="observacoes">Observações</label>
                         <textarea id="observacoes" rows="3"></textarea>
                     </div>
                 </div>
 
-                <!-- TAB PAGAMENTO -->
-                <div class="tab-content" id="tab-pagamento">
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="dataPagamento">Data Pagamento</label>
-                            <input type="date" id="dataPagamento">
-                        </div>
-                        <div class="form-group">
-                            <label for="status">Status <span class="required">*</span></label>
-                            <select id="status" required>
-                                <option value="A_RECEBER">A Receber</option>
-                                <option value="PAGO">Pago</option>
-                            </select>
-                        </div>
-                    </div>
+                <div class="modal-actions">
+                    <button type="button" onclick="closeFormModal()" class="secondary">Cancelar</button>
+                    <button type="submit" class="success">Salvar</button>
                 </div>
-            </div>
-
-            <div class="modal-actions">
-                <button type="button" id="btnPrevious" onclick="previousTab()" class="secondary" style="display: none;">Anterior</button>
-                <button type="button" id="btnNext" onclick="nextTab()" class="secondary">Próximo</button>
-                <button type="button" onclick="closeFormModal()" class="secondary">Cancelar</button>
-                <button type="button" id="btnSave" onclick="saveConta()" class="primary" style="display: none;">Salvar</button>
-            </div>
+            </form>
         </div>
     </div>
 
@@ -288,24 +262,25 @@
     <div class="modal-overlay" id="infoModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 class="modal-title">NF Nº <span id="modalNumero"></span></h3>
+                <h3 class="modal-title">NF <span id="modalNumero"></span></h3>
                 <button class="close-modal" onclick="closeInfoModal()">✕</button>
             </div>
             
-            <div class="tabs-container">
-                <div class="tabs-nav">
-                    <button class="tab-btn active" onclick="switchInfoTab('info-tab-geral')">Geral</button>
-                    <button class="tab-btn" onclick="switchInfoTab('info-tab-pagamento')">Pagamento</button>
-                </div>
-
-                <div class="tab-content active" id="info-tab-geral"></div>
-                <div class="tab-content" id="info-tab-pagamento"></div>
+            <div class="info-section">
+                <p><strong>Órgão:</strong> <span id="infoOrgao"></span></p>
+                <p><strong>Vendedor:</strong> <span id="infoVendedor"></span></p>
+                <p><strong>Banco:</strong> <span id="infoBanco"></span></p>
+                <p><strong>Valor:</strong> <span id="infoValor"></span></p>
+                <p><strong>Data Emissão:</strong> <span id="infoDataEmissao"></span></p>
+                <p><strong>Data Vencimento:</strong> <span id="infoDataVencimento"></span></p>
+                <p><strong>Data Pagamento:</strong> <span id="infoDataPagamento"></span></p>
+                <p><strong>Status:</strong> <span id="infoStatus"></span></p>
+                <p><strong>Tipo NF:</strong> <span id="infoTipoNf"></span></p>
+                <p><strong>Observações:</strong> <span id="infoObservacoes"></span></p>
             </div>
 
             <div class="modal-actions">
-                <button type="button" id="btnInfoPrevious" onclick="previousInfoTab()" class="secondary" style="display: none;">Anterior</button>
-                <button type="button" id="btnInfoNext" onclick="nextInfoTab()" class="secondary">Próximo</button>
-                <button type="button" id="btnInfoClose" onclick="closeInfoModal()" class="secondary">Fechar</button>
+                <button type="button" onclick="closeInfoModal()" class="secondary">Fechar</button>
             </div>
         </div>
     </div>
@@ -318,16 +293,15 @@
                 <button class="close-modal" onclick="closeVencidosModal()">✕</button>
             </div>
             
-            <div style="overflow-x: auto; padding: 1.5rem;">
+            <div style="overflow-x: auto;">
                 <table>
                     <thead>
                         <tr>
                             <th>NF</th>
                             <th>Órgão</th>
                             <th>Data Emissão</th>
-                            <th>Data Vencimento</th>
                             <th>Valor</th>
-                            <th style="text-align: center;">Ações</th>
+                            <th>Vencimento</th>
                         </tr>
                     </thead>
                     <tbody id="vencidosContainer"></tbody>
