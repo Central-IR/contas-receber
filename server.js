@@ -15,30 +15,28 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = createClient(supabaseUrl, supabaseKey);
 console.log('✅ Supabase configurado:', supabaseUrl);
 
-// CORS mais permissivo para desenvolvimento
+// CORS mais permissivo
 app.use(cors({
-    origin: function(origin, callback) {
-        // Permite requisições sem origin (mobile apps, curl, etc)
-        if (!origin) return callback(null, true);
-        
-        const allowedOrigins = [
-            'https://contas-receber.onrender.com',
-            'http://localhost:3000',
-            'http://localhost:10000',
-            'http://127.0.0.1:3000',
-            'http://127.0.0.1:10000'
-        ];
-        
-        if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('localhost')) {
-            callback(null, true);
-        } else {
-            callback(null, true); // Permitir todas as origens em desenvolvimento
-        }
-    },
+    origin: '*', // Permitir todas as origens em desenvolvimento
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-Token']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-Token', 'Accept'],
+    exposedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// Adicionar headers CORS manualmente também
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Session-Token, Accept');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    
+    // Responder OPTIONS requests imediatamente
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    next();
+});
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true }));
