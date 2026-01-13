@@ -1,16 +1,14 @@
 // ============================================
 // CONFIGURAÇÕES
 // ============================================
-const DEVELOPMENT_MODE = false; // Mudar de true para false // TRUE = Dados simulados | FALSE = API Real
+const DEVELOPMENT_MODE = true; // TRUE = Sem autenticação, MAS conecta com API
 const PORTAL_URL = 'https://ir-comercio-portal-zcan.onrender.com';
-const API_URL = 'https://contas-receber-mlxw.onrender.com/api'; // API Contas a Receber
+const API_URL = 'https://contas-receber-mlxw.onrender.com/api';
 
 let contas = [];
 let currentMonth = new Date();
 let isOnline = false;
 let sessionToken = null;
-let lastDataHash = '';
-let useMockData = false; // Flag para fallback com dados mock
 
 console.log('🚀 Contas a Receber iniciada');
 console.log('📍 API URL:', API_URL);
@@ -21,96 +19,61 @@ console.log('🔧 Modo desenvolvimento:', DEVELOPMENT_MODE);
 // ============================================
 document.addEventListener('DOMContentLoaded', () => {
     if (DEVELOPMENT_MODE) {
-        console.log('⚠️ MODO DESENVOLVIMENTO ATIVADO');
+        console.log('⚠️ MODO DESENVOLVIMENTO - Sem autenticação');
         sessionToken = 'dev-mode';
-        inicializarApp();
-    } else {
-        verificarAutenticacao();
     }
-});
-
-function verificarAutenticacao() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const tokenFromUrl = urlParams.get('sessionToken');
-
-    if (tokenFromUrl) {
-        sessionToken = tokenFromUrl;
-        sessionStorage.setItem('contasReceberSession', tokenFromUrl);
-        window.history.replaceState({}, document.title, window.location.pathname);
-    } else {
-        sessionToken = sessionStorage.getItem('contasReceberSession');
-    }
-
-    if (!sessionToken) {
-        mostrarTelaAcessoNegado();
-        return;
-    }
-
     inicializarApp();
-}
-
-function mostrarTelaAcessoNegado(mensagem = 'NÃO AUTORIZADO') {
-    document.body.innerHTML = `
-        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: var(--bg-primary); color: var(--text-primary); text-align: center; padding: 2rem;">
-            <h1 style="font-size: 2.2rem; margin-bottom: 1rem;">${mensagem}</h1>
-            <p style="color: var(--text-secondary); margin-bottom: 2rem;">Somente usuários autenticados podem acessar esta área.</p>
-            <a href="${PORTAL_URL}" style="display: inline-block; background: var(--btn-register); color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600;">Ir para o Portal</a>
-        </div>
-    `;
-}
+});
 
 function inicializarApp() {
     updateDisplay();
     checkServerStatus();
     setInterval(checkServerStatus, 15000);
     loadContas();
+    setInterval(loadContas, 10000); // Polling a cada 10 segundos
 }
 
 // ============================================
 // STATUS DO SERVIDOR
 // ============================================
 async function checkServerStatus() {
-    // No modo desenvolvimento ou mock, simular status online
-    if (DEVELOPMENT_MODE || useMockData) {
-        updateConnectionStatus(true);
-        return;
-    }
-
     try {
         const headers = {
             'Accept': 'application/json'
         };
 
-        if (sessionToken) {
+        if (!DEVELOPMENT_MODE && sessionToken) {
             headers['X-Session-Token'] = sessionToken;
         }
 
-        const response = await fetch(`${API_URL}/health`, {
+        const response = await fetch(`${API_URL}/contas`, {
             method: 'GET',
             headers: headers,
             mode: 'cors'
         });
 
-        if (response.ok) {
-            updateConnectionStatus(true);
-        } else if (response.status === 401) {
-            console.warn('⚠️ Erro de autenticação (401)');
-            updateConnectionStatus(false);
-        } else {
-            console.warn(`⚠️ Erro ao verificar status: ${response.status}`);
-            updateConnectionStatus(false);
+        const wasOffline = !isOnline;
+        isOnline = response.ok;
+
+        if (wasOffline && isOnline) {
+            console.log('✅ SERVIDOR ONLINE');
+            await loadContas();
         }
+
+        updateConnectionStatus();
+        return isOnline;
     } catch (error) {
-        console.error('❌ Erro ao verificar status:', error.message);
-        updateConnectionStatus(false);
+        console.error('❌ Erro ao verificar servidor:', error);
+        isOnline = false;
+        updateConnectionStatus();
+        return false;
     }
 }
 
-function updateConnectionStatus(online) {
-    isOnline = online;
-    const statusEl = document.getElementById('connectionStatus');
-    if (statusEl) {
-        statusEl.className = `connection-status ${online ? 'online' : 'offline'}`;
+function updateConnectionStatus() {
+    const statusElement = document.getElementById('connectionStatus');
+    if (statusElement) {
+        statusElement.className = isOnline ? 'connection-status online' : 'connection-status offline';
     }
 }
 
@@ -146,27 +109,18 @@ function nextMonth() {
 // CARREGAR CONTAS
 // ============================================
 async function loadContas() {
-    try {
-        // No modo desenvolvimento, usar dados simulados
-        if (DEVELOPMENT_MODE || useMockData) {
-            console.log('📦 Usando dados simulados');
-            contas = generateMockData();
-            renderContas();
-            updateDashboard();
-            return;
-        }
+    if (!isOnline) return;
 
+    try {
         const headers = {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
+            'Accept': 'application/json'
         };
 
-        if (sessionToken) {
+        if (!DEVELOPMENT_MODE && sessionToken) {
             headers['X-Session-Token'] = sessionToken;
         }
 
         console.log('🔄 Carregando contas da API...');
-        console.log('📝 Headers:', { ...headers, 'X-Session-Token': sessionToken ? '***' : 'não definido' });
 
         const response = await fetch(`${API_URL}/contas`, {
             method: 'GET',
@@ -177,10 +131,8 @@ async function loadContas() {
         console.log('📡 Resposta da API:', response.status, response.statusText);
 
         if (!response.ok) {
-            if (response.status === 401) {
-                throw new Error('Não autorizado. Token de sessão inválido ou expirado.');
-            }
-            throw new Error(`Erro ${response.status}: ${response.statusText}`);
+            console.error('❌ Erro ao carregar contas:', response.status);
+            return;
         }
 
         const data = await response.json();
@@ -203,59 +155,15 @@ async function loadContas() {
 
         renderContas();
         updateDashboard();
-        console.log('✅ Contas carregadas com sucesso:', contas.length, 'registros');
+        console.log('✅ Contas carregadas:', contas.length, 'registros');
         
     } catch (error) {
         console.error('❌ Erro ao carregar contas:', error.message);
-        showToast(error.message || 'Erro ao carregar contas', 'error');
-        
-        // Ativar modo mock como fallback
-        if (!useMockData && contas.length === 0) {
-            console.log('📦 Ativando dados simulados como fallback');
-            useMockData = true;
-            loadContas(); // Tentar novamente com dados mock
-        }
     }
 }
 
 // ============================================
-// DADOS SIMULADOS (MODO DESENVOLVIMENTO)
-// ============================================
-function generateMockData() {
-    const vendedores = ['JOÃO SILVA', 'MARIA SANTOS', 'PEDRO OLIVEIRA', 'ANA COSTA'];
-    const orgaos = ['PREFEITURA MUNICIPAL', 'GOVERNO DO ESTADO', 'CÂMARA MUNICIPAL', 'SECRETARIA DE OBRAS'];
-    const bancos = ['BANCO DO BRASIL', 'CAIXA', 'BRADESCO', 'ITAÚ'];
-    const status = ['PAGO', 'PENDENTE', 'VENCIDO'];
-    
-    const mockContas = [];
-    const year = currentMonth.getFullYear();
-    const month = currentMonth.getMonth();
-    
-    for (let i = 1; i <= 15; i++) {
-        const randomStatus = status[Math.floor(Math.random() * status.length)];
-        const randomDay = Math.floor(Math.random() * 28) + 1;
-        const valor = (Math.random() * 50000 + 5000).toFixed(2);
-        
-        mockContas.push({
-            id: i,
-            nf: `NF-${1000 + i}`,
-            orgao: orgaos[Math.floor(Math.random() * orgaos.length)],
-            vendedor: vendedores[Math.floor(Math.random() * vendedores.length)],
-            banco: bancos[Math.floor(Math.random() * bancos.length)],
-            dataEmissao: new Date(year, month, randomDay).toISOString(),
-            dataVencimento: new Date(year, month, randomDay + 30).toISOString(),
-            dataPagamento: randomStatus === 'PAGO' ? new Date(year, month, randomDay + 25).toISOString() : null,
-            valor: parseFloat(valor),
-            status: randomStatus,
-            observacoes: `Observação para NF-${1000 + i}`
-        });
-    }
-    
-    return mockContas;
-}
-
-// ============================================
-// RENDERIZAR CONTAS
+// UTILITÁRIOS
 // ============================================
 function renderContas() {
     const container = document.getElementById('contasContainer');
@@ -515,17 +423,3 @@ function showToast(message, type = 'success') {
         setTimeout(() => messageDiv.remove(), 300);
     }, 3000);
 }
-
-// ============================================
-// FUNÇÃO PARA ALTERNAR MODO (DEBUG)
-// ============================================
-function toggleMockMode() {
-    useMockData = !useMockData;
-    const mode = useMockData ? 'DADOS SIMULADOS' : 'API REAL';
-    console.log(`🔄 Alternando para: ${mode}`);
-    showToast(`Modo alterado para: ${mode}`, 'info');
-    loadContas();
-}
-
-// Expor função globalmente para debug
-window.toggleMockMode = toggleMockMode;
