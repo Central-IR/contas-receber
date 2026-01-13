@@ -3,7 +3,7 @@
 // ============================================
 const DEVELOPMENT_MODE = true; // TRUE = Sem autenticação, MAS conecta com API
 const PORTAL_URL = 'https://ir-comercio-portal-zcan.onrender.com';
-const API_URL = 'https://contas-receber-mlxw.onrender.com/api';
+const API_URL = 'https://contas-receber-mlxw.onrender.com';
 
 let contas = [];
 let currentMonth = new Date();
