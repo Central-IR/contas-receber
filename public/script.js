@@ -42,10 +42,6 @@ async function checkServerStatus() {
             'Accept': 'application/json'
         };
 
-        if (!DEVELOPMENT_MODE && sessionToken) {
-            headers['X-Session-Token'] = sessionToken;
-        }
-
         const response = await fetch(`${API_URL}/contas`, {
             method: 'GET',
             headers: headers,
@@ -115,10 +111,6 @@ async function loadContas() {
         const headers = {
             'Accept': 'application/json'
         };
-
-        if (!DEVELOPMENT_MODE && sessionToken) {
-            headers['X-Session-Token'] = sessionToken;
-        }
 
         console.log('🔄 Carregando contas da API...');
 
