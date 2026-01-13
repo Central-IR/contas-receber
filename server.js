@@ -2,206 +2,330 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
-require('dotenv').config();
-
 const app = express();
-const PORT = process.env.PORT || 3000;
 
-// Configuração do Supabase
-const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Middlewares
+if (!supabaseUrl || !supabaseKey) {
+    console.error('❌ ERRO: SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY não configurados');
+    process.exit(1);
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+console.log('✅ Supabase configurado:', supabaseUrl);
+
+// CORS mais permissivo para desenvolvimento
 app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'X-Session-Token', 'Accept']
+    origin: function(origin, callback) {
+        // Permite requisições sem origin (mobile apps, curl, etc)
+        if (!origin) return callback(null, true);
+        
+        const allowedOrigins = [
+            'https://contas-receber.onrender.com',
+            'http://localhost:3000',
+            'http://localhost:10000',
+            'http://127.0.0.1:3000',
+            'http://127.0.0.1:10000'
+        ];
+        
+        if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('localhost')) {
+            callback(null, true);
+        } else {
+            callback(null, true); // Permitir todas as origens em desenvolvimento
+        }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-Token']
 }));
-app.use(express.json());
 
-// Servir arquivos estáticos (Frontend) da pasta 'public'
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true }));
 
-// Middleware de autenticação para API
-const authenticate = (req, res, next) => {
-    const sessionToken = req.headers['x-session-token'];
-    
-    if (!sessionToken) {
-        return res.status(401).json({ error: 'Token de sessão não fornecido' });
+// Servir arquivos estáticos
+app.use(express.static(path.join(__dirname, 'public'), {
+    setHeaders: (res, filepath) => {
+        if (filepath.endsWith('.js')) res.setHeader('Content-Type', 'application/javascript');
+        else if (filepath.endsWith('.css')) res.setHeader('Content-Type', 'text/css');
+        else if (filepath.endsWith('.html')) res.setHeader('Content-Type', 'text/html');
     }
-    
-    req.sessionToken = sessionToken;
+}));
+
+app.use((req, res, next) => {
+    console.log(`🔥 ${new Date().toISOString()} - ${req.method} ${req.path}`);
     next();
-};
-
-// ============================================
-// ROTAS DA API
-// ============================================
-
-// Health check
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// GET - Listar todas as contas
-app.get('/api/contas', authenticate, async (req, res) => {
-    try {
-        const { data, error } = await supabase
-            .from('contas_receber')
-            .select('*')
-            .order('data_vencimento', { ascending: false });
+// AUTENTICAÇÃO
+const PORTAL_URL = process.env.PORTAL_URL || 'https://ir-comercio-portal-zcan.onrender.com';
 
-        if (error) throw error;
+async function verificarAutenticacao(req, res, next) {
+    const publicPaths = ['/', '/health', '/diagnostico.html'];
+    if (publicPaths.includes(req.path)) return next();
 
-        res.json(data || []);
-    } catch (error) {
-        console.error('Erro ao buscar contas:', error);
-        res.status(500).json({ 
-            error: 'Erro ao buscar contas', 
-            details: error.message 
-        });
+    // FORÇAR MODO DESENVOLVIMENTO - DESABILITAR PARA PRODUÇÃO
+    const DEVELOPMENT_MODE = true; // SEMPRE TRUE = SEM AUTENTICAÇÃO
+    if (DEVELOPMENT_MODE) {
+        console.log('⚠️ MODO DESENVOLVIMENTO - Autenticação desabilitada');
+        return next();
     }
-});
 
-// GET - Buscar conta por ID
-app.get('/api/contas/:id', authenticate, async (req, res) => {
+    const sessionToken = req.headers['x-session-token'];
+    if (!sessionToken) {
+        console.log('❌ Token não fornecido');
+        return res.status(401).json({ error: 'Não autenticado' });
+    }
+
     try {
-        const { id } = req.params;
+        const verifyResponse = await fetch(`${PORTAL_URL}/api/verify-session`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionToken })
+        });
 
-        const { data, error } = await supabase
-            .from('contas_receber')
-            .select('*')
-            .eq('id', id)
-            .single();
-
-        if (error) throw error;
-
-        if (!data) {
-            return res.status(404).json({ error: 'Conta não encontrada' });
+        if (!verifyResponse.ok) {
+            console.log('❌ Sessão inválida - Status:', verifyResponse.status);
+            return res.status(401).json({ error: 'Sessão inválida' });
         }
 
-        res.json(data);
+        const sessionData = await verifyResponse.json();
+        if (!sessionData.valid) {
+            console.log('❌ Sessão não válida');
+            return res.status(401).json({ error: 'Sessão inválida' });
+        }
+
+        req.user = sessionData.session;
+        req.sessionToken = sessionToken;
+        console.log('✅ Autenticação OK');
+        next();
     } catch (error) {
-        console.error('Erro ao buscar conta:', error);
+        console.error('❌ Erro ao verificar autenticação:', error.message);
+        return res.status(500).json({ error: 'Erro ao verificar autenticação', details: error.message });
+    }
+}
+
+// ROTAS DA API
+app.get('/api/contas', verificarAutenticacao, async (req, res) => {
+    try {
+        console.log('📋 Listando contas...');
+        const { data, error } = await supabase
+            .from('contas_receber')
+            .select('*')
+            .order('data_emissao', { ascending: false });
+
+        if (error) {
+            console.error('❌ Erro Supabase ao listar:', error);
+            throw error;
+        }
+        
+        console.log(`✅ ${data?.length || 0} contas encontradas`);
+        res.json(data || []);
+    } catch (error) {
+        console.error('❌ Erro ao listar contas:', error.message);
         res.status(500).json({ 
-            error: 'Erro ao buscar conta', 
-            details: error.message 
+            success: false, 
+            error: 'Erro ao listar contas',
+            message: error.message
         });
     }
 });
 
-// POST - Criar nova conta
-app.post('/api/contas', authenticate, async (req, res) => {
+app.get('/api/contas/:id', verificarAutenticacao, async (req, res) => {
     try {
-        const contaData = req.body;
+        console.log(`🔍 Buscando conta ID: ${req.params.id}`);
+        const { data, error } = await supabase
+            .from('contas_receber')
+            .select('*')
+            .eq('id', req.params.id)
+            .single();
+
+        if (error) {
+            if (error.code === 'PGRST116') {
+                console.log('❌ Conta não encontrada');
+                return res.status(404).json({ success: false, error: 'Conta não encontrada' });
+            }
+            throw error;
+        }
+
+        console.log('✅ Conta encontrada');
+        res.json(data);
+    } catch (error) {
+        console.error('❌ Erro ao buscar conta:', error.message);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Erro ao buscar conta',
+            message: error.message
+        });
+    }
+});
+
+app.post('/api/contas', verificarAutenticacao, async (req, res) => {
+    try {
+        console.log('➕ Criando nova conta...');
+        
+        const { 
+            numero_nf, orgao, vendedor, banco, valor, data_emissao, 
+            data_vencimento, data_pagamento, status, tipo_nf, observacoes
+        } = req.body;
 
         // Validações básicas
-        if (!contaData.numero_nf || !contaData.orgao || !contaData.vendedor || 
-            !contaData.banco || !contaData.valor || !contaData.data_emissao || 
-            !contaData.data_vencimento) {
+        if (!numero_nf || !orgao || !vendedor || !data_emissao) {
             return res.status(400).json({ 
+                success: false, 
                 error: 'Campos obrigatórios faltando',
-                details: 'numero_nf, orgao, vendedor, banco, valor, data_emissao e data_vencimento são obrigatórios'
+                details: 'numero_nf, orgao, vendedor e data_emissao são obrigatórios'
             });
         }
 
-        const { data, error } = await supabase
-            .from('contas_receber')
-            .insert([contaData])
-            .select()
-            .single();
-
-        if (error) throw error;
-
-        res.status(201).json(data);
-    } catch (error) {
-        console.error('Erro ao criar conta:', error);
-        res.status(500).json({ 
-            error: 'Erro ao criar conta', 
-            details: error.message 
-        });
-    }
-});
-
-// PUT - Atualizar conta
-app.put('/api/contas/:id', authenticate, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const contaData = req.body;
-
-        // Remove o ID do body se existir
-        delete contaData.id;
-        delete contaData.created_at;
+        const novaConta = {
+            numero_nf,
+            orgao,
+            vendedor,
+            banco: banco || null,
+            valor: valor || 0,
+            data_emissao,
+            data_vencimento: data_vencimento || null,
+            data_pagamento: data_pagamento || null,
+            status: status || 'A_RECEBER',
+            tipo_nf: tipo_nf || 'ENVIO',
+            observacoes: observacoes || null
+        };
 
         const { data, error } = await supabase
             .from('contas_receber')
-            .update(contaData)
-            .eq('id', id)
+            .insert([novaConta])
             .select()
             .single();
 
-        if (error) throw error;
-
-        if (!data) {
-            return res.status(404).json({ error: 'Conta não encontrada' });
+        if (error) {
+            console.error('❌ Erro Supabase ao inserir:', error);
+            throw error;
         }
 
-        res.json(data);
+        console.log('✅ Conta criada com sucesso! ID:', data.id);
+        res.status(201).json(data);
     } catch (error) {
-        console.error('Erro ao atualizar conta:', error);
+        console.error('❌ Erro ao criar conta:', error);
         res.status(500).json({ 
-            error: 'Erro ao atualizar conta', 
-            details: error.message 
+            success: false, 
+            error: 'Erro ao criar conta',
+            message: error.message
         });
     }
 });
 
-// DELETE - Excluir conta
-app.delete('/api/contas/:id', authenticate, async (req, res) => {
+app.put('/api/contas/:id', verificarAutenticacao, async (req, res) => {
     try {
-        const { id } = req.params;
+        console.log(`✏️ Atualizando conta ID: ${req.params.id}`);
+        
+        const { 
+            numero_nf, orgao, vendedor, banco, valor, data_emissao, 
+            data_vencimento, data_pagamento, status, tipo_nf, observacoes
+        } = req.body;
 
+        const contaAtualizada = {
+            numero_nf,
+            orgao,
+            vendedor,
+            banco: banco || null,
+            valor: valor || 0,
+            data_emissao,
+            data_vencimento: data_vencimento || null,
+            data_pagamento: data_pagamento || null,
+            status: status || 'A_RECEBER',
+            tipo_nf: tipo_nf || 'ENVIO',
+            observacoes: observacoes || null
+        };
+
+        const { data, error } = await supabase
+            .from('contas_receber')
+            .update(contaAtualizada)
+            .eq('id', req.params.id)
+            .select()
+            .single();
+
+        if (error) {
+            if (error.code === 'PGRST116') {
+                return res.status(404).json({ success: false, error: 'Conta não encontrada' });
+            }
+            throw error;
+        }
+
+        console.log('✅ Conta atualizada com sucesso!');
+        res.json(data);
+    } catch (error) {
+        console.error('❌ Erro ao atualizar conta:', error.message);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Erro ao atualizar conta',
+            message: error.message
+        });
+    }
+});
+
+app.delete('/api/contas/:id', verificarAutenticacao, async (req, res) => {
+    try {
+        console.log(`🗑️ Deletando conta ID: ${req.params.id}`);
         const { error } = await supabase
             .from('contas_receber')
             .delete()
-            .eq('id', id);
+            .eq('id', req.params.id);
 
         if (error) throw error;
 
-        res.json({ message: 'Conta excluída com sucesso' });
+        console.log('✅ Conta deletada com sucesso!');
+        res.json({ success: true, message: 'Conta removida com sucesso' });
     } catch (error) {
-        console.error('Erro ao excluir conta:', error);
+        console.error('❌ Erro ao deletar conta:', error.message);
         res.status(500).json({ 
-            error: 'Erro ao excluir conta', 
-            details: error.message 
+            success: false, 
+            error: 'Erro ao deletar conta',
+            message: error.message
         });
     }
 });
 
-// Rota raiz - redireciona para o index.html
+// ROTAS DE SAÚDE
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Rota 404 para API
-app.use('/api/*', (req, res) => {
-    res.status(404).json({ error: 'Rota da API não encontrada' });
-});
-
-// Error handler
+// TRATAMENTO GLOBAL DE ERROS
 app.use((err, req, res, next) => {
-    console.error('Erro não tratado:', err);
-    res.status(500).json({ 
-        error: 'Erro interno do servidor', 
-        details: err.message 
+    console.error('❌ Erro não tratado:', err);
+    res.status(500).json({
+        success: false,
+        error: 'Erro interno do servidor',
+        message: err.message
     });
 });
 
-// Iniciar servidor
-app.listen(PORT, () => {
-    console.log(`🚀 API Contas a Receber rodando na porta ${PORT}`);
-    console.log(`📍 Frontend: http://localhost:${PORT}`);
-    console.log(`📍 API Health: http://localhost:${PORT}/api/health`);
+// INICIAR SERVIDOR
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, '0.0.0.0', () => {
+    console.log('');
+    console.log('===============================================');
+    console.log('🚀 CONTAS A RECEBER');
+    console.log('===============================================');
+    console.log(`✅ Porta: ${PORT}`);
+    console.log(`✅ Supabase: ${supabaseUrl}`);
+    console.log(`✅ Portal: ${PORTAL_URL}`);
+    console.log('===============================================');
 });
+
+process.on('unhandledRejection', (reason) => {
+    console.error('❌ Unhandled Rejection:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('❌ Uncaught Exception:', error);
+    process.exit(1);
+});
+
+module.exports = app;
