@@ -2,8 +2,13 @@
 // CONFIGURAÇÃO
 // ============================================
 const DEVELOPMENT_MODE = false;
+
+// Auto-detectar a URL da API baseado no ambiente
+const API_URL = window.location.hostname === 'localhost' 
+    ? 'http://localhost:10000'  // Desenvolvimento local
+    : window.location.origin;    // Produção - mesma origem
+
 const PORTAL_URL = 'https://ir-comercio-portal-zcan.onrender.com';
-const API_URL = 'https://contas-receber-mlxw.onrender.com';
 
 let contas = [];
 let isOnline = false;
@@ -17,6 +22,7 @@ const meses = [
 
 console.log('✅ Contas a Receber iniciado');
 console.log('📍 API URL:', API_URL);
+console.log('🌍 Origin:', window.location.origin);
 console.log('🔧 Modo desenvolvimento:', DEVELOPMENT_MODE);
 
 // ============================================
