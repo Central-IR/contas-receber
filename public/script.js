@@ -354,7 +354,8 @@ function inicializarApp() {
 async function checkServerStatus() {
     try {
         const headers = {
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
         };
         
         if (!DEVELOPMENT_MODE && sessionToken) {
@@ -364,7 +365,8 @@ async function checkServerStatus() {
         const response = await fetch(`${API_URL}/api/contas`, {
             method: 'GET',
             headers: headers,
-            mode: 'cors'
+            mode: 'cors',
+            credentials: 'include'
         });
 
         if (!DEVELOPMENT_MODE && response.status === 401) {
@@ -416,9 +418,11 @@ async function loadContas(showMessage = false) {
             headers: { 
                 'X-Session-Token': sessionToken,
                 'Accept': 'application/json',
+                'Content-Type': 'application/json',
                 'Cache-Control': 'no-cache'
             },
-            mode: 'cors'
+            mode: 'cors',
+            credentials: 'include'
         });
 
         if (!DEVELOPMENT_MODE && response.status === 401) {
