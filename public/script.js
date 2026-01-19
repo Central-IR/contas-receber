@@ -20,6 +20,84 @@ console.log('📍 API URL:', API_URL);
 console.log('🔧 Modo desenvolvimento:', DEVELOPMENT_MODE);
 
 // ============================================
+// CALENDAR - INTEGRADO NO SCRIPT PRINCIPAL
+// ============================================
+let calendarYear = new Date().getFullYear();
+
+window.toggleCalendar = function() {
+    const modal = document.getElementById('calendarModal');
+    if (!modal) return;
+    
+    if (modal.classList.contains('show')) {
+        modal.classList.remove('show');
+    } else {
+        calendarYear = currentMonth.getFullYear();
+        renderCalendar();
+        modal.classList.add('show');
+    }
+};
+
+window.changeCalendarYear = function(direction) {
+    calendarYear += direction;
+    renderCalendar();
+};
+
+function renderCalendar() {
+    const yearElement = document.getElementById('calendarYear');
+    const monthsContainer = document.getElementById('calendarMonths');
+    
+    if (!yearElement || !monthsContainer) return;
+    
+    yearElement.textContent = calendarYear;
+    
+    const currentYear = currentMonth.getFullYear();
+    const currentMonthIndex = currentMonth.getMonth();
+    
+    monthsContainer.innerHTML = meses.map((month, index) => {
+        const isCurrent = calendarYear === currentYear && index === currentMonthIndex;
+        return `
+            <div class="calendar-month ${isCurrent ? 'current' : ''}" 
+                 onclick="selectMonth(${index})">
+                ${month}
+            </div>
+        `;
+    }).join('');
+}
+
+window.selectMonth = function(monthIndex) {
+    currentMonth = new Date(calendarYear, monthIndex, 1);
+    updateDisplay();
+    toggleCalendar();
+};
+
+// Fechar modal ao clicar fora
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('calendarModal');
+    if (!modal) return;
+    
+    const calendarContent = modal.querySelector('.calendar-content');
+    const calendarBtn = event.target.closest('.calendar-btn[onclick="toggleCalendar()"]');
+    
+    if (modal.classList.contains('show') && 
+        !calendarContent?.contains(event.target) && 
+        !calendarBtn) {
+        toggleCalendar();
+    }
+});
+
+// Fechar modal com ESC
+document.addEventListener('keydown', function(event) {
+    const modal = document.getElementById('calendarModal');
+    if (!modal) return;
+    
+    if (event.key === 'Escape' && modal.classList.contains('show')) {
+        toggleCalendar();
+    }
+});
+
+console.log('✅ Calendar integrado carregado');
+
+// ============================================
 // INICIALIZAÇÃO
 // ============================================
 document.addEventListener('DOMContentLoaded', () => {
@@ -89,7 +167,7 @@ window.handleDeleteClick = function(id) {
     
     // Remove no servidor
     if (isOnline || DEVELOPMENT_MODE) {
-        fetch(`${API_URL}/contas/${idStr}`, {
+        fetch(`${API_URL}/api/contas/${idStr}`, {
             method: 'DELETE',
             headers: {
                 'X-Session-Token': sessionToken,
@@ -283,7 +361,7 @@ async function checkServerStatus() {
             headers['X-Session-Token'] = sessionToken;
         }
 
-        const response = await fetch(`${API_URL}/contas`, {
+        const response = await fetch(`${API_URL}/api/contas`, {
             method: 'GET',
             headers: headers,
             mode: 'cors'
@@ -333,7 +411,7 @@ async function loadContas(showMessage = false) {
 
     try {
         const timestamp = new Date().getTime();
-        const response = await fetch(`${API_URL}/contas?_t=${timestamp}`, {
+        const response = await fetch(`${API_URL}/api/contas?_t=${timestamp}`, {
             method: 'GET',
             headers: { 
                 'X-Session-Token': sessionToken,
@@ -802,3 +880,4 @@ function showToast(message, type) {
 }
 
 console.log('✅ Script completo carregado com sucesso!');
+console.log('📅 Calendar integrado no script principal');
