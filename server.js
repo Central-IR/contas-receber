@@ -16,38 +16,66 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 console.log('✅ Supabase configurado:', supabaseUrl);
 
 // ============================================
-// CORS - ULTRA PERMISSIVO (NUCLEAR OPTION)
+// CORS - CONFIGURAÇÃO MELHORADA
 // ============================================
 
-// Middleware 1: Permitir tudo antes de qualquer rota
+// Lista de origens permitidas (adicione seu domínio do frontend aqui)
+const allowedOrigins = [
+    'https://ir-comercio-portal-zcan.onrender.com',
+    'https://contas-receber-mlxw.onrender.com',
+    'http://localhost:3000',
+    'http://localhost:10000',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:10000'
+];
+
+// Middleware CORS personalizado - DEVE VIR ANTES DE TUDO
 app.use((req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', '*');
-    res.setHeader('Access-Control-Allow-Headers', '*');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    const origin = req.headers.origin;
     
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
+    // Em produção, verificar origem; em dev, permitir todas
+    if (process.env.NODE_ENV === 'development' || !origin || allowedOrigins.includes(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin || '*');
     }
+    
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Session-Token, Authorization, Accept, Cache-Control');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Max-Age', '86400'); // 24 horas
+    
+    // Responder imediatamente para OPTIONS (preflight)
+    if (req.method === 'OPTIONS') {
+        return res.status(204).end();
+    }
+    
     next();
 });
 
-// Middleware 2: CORS package (redundante, mas garante)
+// Middleware CORS package (backup)
 app.use(cors({
-    origin: '*',
+    origin: function (origin, callback) {
+        // Permitir requisições sem origin (mobile apps, Postman, etc)
+        if (!origin) return callback(null, true);
+        
+        if (process.env.NODE_ENV === 'development' || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(null, true); // Temporariamente permitir todas em produção
+        }
+    },
     credentials: true,
-    methods: '*',
-    allowedHeaders: '*',
-    optionsSuccessStatus: 200
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'X-Session-Token', 'Authorization', 'Accept', 'Cache-Control'],
+    optionsSuccessStatus: 204
 }));
 
-// Middleware 3: JSON parser
+// Middleware JSON parser
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Middleware 4: Logs
+// Middleware de Logs
 app.use((req, res, next) => {
-    console.log(`📥 ${req.method} ${req.path}`);
+    console.log(`📥 ${req.method} ${req.path} - Origin: ${req.headers.origin || 'N/A'}`);
     next();
 });
 
@@ -68,13 +96,13 @@ app.use(express.static(path.join(__dirname, 'public'), {
 }));
 
 // ============================================
-// AUTENTICAÇÃO (DESABILITADA EM DEV)
+// AUTENTICAÇÃO
 // ============================================
-const DEVELOPMENT_MODE = true;
+const DEVELOPMENT_MODE = process.env.NODE_ENV === 'development' || process.env.DEV_MODE === 'true';
 const PORTAL_URL = process.env.PORTAL_URL || 'https://ir-comercio-portal-zcan.onrender.com';
 
 async function verificarAutenticacao(req, res, next) {
-    const publicPaths = ['/', '/health', '/diagnostico.html'];
+    const publicPaths = ['/', '/health', '/diagnostico.html', '/api/health'];
     if (publicPaths.includes(req.path)) return next();
 
     if (DEVELOPMENT_MODE) {
@@ -115,6 +143,24 @@ async function verificarAutenticacao(req, res, next) {
 // ============================================
 // ROTAS DA API
 // ============================================
+
+// Health check (sem autenticação)
+app.get('/health', (req, res) => {
+    res.json({ 
+        status: 'ok', 
+        timestamp: new Date().toISOString(),
+        cors: 'enabled',
+        env: process.env.NODE_ENV || 'production'
+    });
+});
+
+app.get('/api/health', (req, res) => {
+    res.json({ 
+        status: 'ok', 
+        timestamp: new Date().toISOString(),
+        supabase: !!supabaseUrl
+    });
+});
 
 // GET /api/contas - Listar todas as contas
 app.get('/api/contas', verificarAutenticacao, async (req, res) => {
@@ -249,19 +295,8 @@ app.delete('/api/contas/:id', verificarAutenticacao, async (req, res) => {
 });
 
 // ============================================
-// ROTAS ESPECIAIS
+// ROTA INDEX
 // ============================================
-
-// Health check
-app.get('/health', (req, res) => {
-    res.json({ 
-        status: 'ok', 
-        timestamp: new Date().toISOString(),
-        cors: 'WIDE OPEN'
-    });
-});
-
-// Index
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -286,14 +321,13 @@ const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log('');
     console.log('===============================================');
-    console.log('🚀 CONTAS A RECEBER - ULTRA PERMISSIVE MODE');
+    console.log('🚀 CONTAS A RECEBER - SERVER STARTED');
     console.log('===============================================');
     console.log(`✅ Porta: ${PORT}`);
     console.log(`✅ Supabase: ${supabaseUrl}`);
     console.log(`✅ Portal: ${PORTAL_URL}`);
-    console.log('⚠️  MODO DESENVOLVIMENTO ATIVO');
-    console.log('⚠️  CORS TOTALMENTE ABERTO (*)');
-    console.log('⚠️  SEM AUTENTICAÇÃO');
+    console.log(`✅ Modo: ${DEVELOPMENT_MODE ? 'DESENVOLVIMENTO' : 'PRODUÇÃO'}`);
+    console.log(`✅ CORS: Configurado`);
     console.log('===============================================');
 });
 
