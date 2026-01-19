@@ -15,30 +15,32 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = createClient(supabaseUrl, supabaseKey);
 console.log('✅ Supabase configurado:', supabaseUrl);
 
-// CORS mais permissivo para desenvolvimento
+// ============================================
+// CORS - CONFIGURAÇÃO CORRIGIDA
+// ============================================
 app.use(cors({
-    origin: function(origin, callback) {
-        // Permite requisições sem origin (mobile apps, curl, etc)
-        if (!origin) return callback(null, true);
-        
-        const allowedOrigins = [
-            'https://contas-receber-mlxw.onrender.com',
-            'http://localhost:3000',
-            'http://localhost:10000',
-            'http://127.0.0.1:3000',
-            'http://127.0.0.1:10000'
-        ];
-        
-        if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('localhost')) {
-            callback(null, true);
-        } else {
-            callback(null, true); // Permitir todas as origens em desenvolvimento
-        }
-    },
+    origin: true, // Permite qualquer origem (use isto apenas em desenvolvimento!)
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-Token']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-Token', 'Accept', 'Cache-Control'],
+    exposedHeaders: ['Content-Type', 'X-Session-Token'],
+    preflightContinue: false,
+    optionsSuccessStatus: 204
 }));
+
+// Headers adicionais para garantir CORS em todas as respostas
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Session-Token, Accept, Cache-Control');
+    
+    // Handle preflight
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(204);
+    }
+    next();
+});
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -282,6 +284,7 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`✅ Supabase: ${supabaseUrl}`);
     console.log(`✅ Portal: ${PORTAL_URL}`);
     console.log('⚠️  MODO DESENVOLVIMENTO ATIVO - SEM AUTENTICAÇÃO');
+    console.log('⚠️  CORS ABERTO - Todas as origens permitidas');
     console.log('===============================================');
 });
 
