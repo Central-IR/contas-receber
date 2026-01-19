@@ -348,10 +348,134 @@ function inicializarApp() {
         return;
     }
     
+    setupEventDelegation(); // ← NOVO
     updateDisplay();
     checkServerStatus();
     setInterval(checkServerStatus, 15000);
     startPolling();
+}
+
+// ============================================
+// EVENT DELEGATION PARA CHECKBOXES
+// ============================================
+function setupEventDelegation() {
+    document.body.addEventListener('change', function(e) {
+        if (e.target.type === 'checkbox' && e.target.classList.contains('styled-checkbox')) {
+            const row = e.target.closest('tr[data-id]');
+            if (row) {
+                const id = row.getAttribute('data-id');
+                console.log('☑️ Checkbox alterado - ID:', id);
+                window.handleCheckboxChange(id);
+            }
+        }
+    });
+    
+    console.log('✅ Event Delegation configurado');
+}
+
+// ============================================
+// HANDLER DE CHECKBOX - MARCAR COMO PAGO
+// ============================================
+window.handleCheckboxChange = async function(id) {
+    console.log('☑️ Checkbox alterado:', id);
+    
+    const idStr = String(id);
+    const conta = contas.find(c => String(c.id) === idStr);
+    
+    if (!conta) {
+        console.error('Conta não encontrada:', id);
+        return;
+    }
+    
+    // Tipos permitidos para marcar como pago
+    const tiposPermitidos = ['ENVIO', 'SIMPLES_REMESSA'];
+    const tipoNf = conta.tipo_nf || 'ENVIO';
+    
+    if (!tiposPermitidos.includes(tipoNf)) {
+        console.log('Tipo de NF não permite marcação:', tipoNf);
+        return;
+    }
+    
+    // Toggle entre PAGO e PENDENTE
+    const novoStatus = conta.status === 'PAGO' ? 'PENDENTE' : 'PAGO';
+    const dataPagamento = novoStatus === 'PAGO' ? new Date().toISOString().split('T')[0] : null;
+    
+    if (isOnline || DEVELOPMENT_MODE) {
+        try {
+            const updateData = {
+                status: novoStatus,
+                data_pagamento: dataPagamento,
+                updated_at: new Date().toISOString()
+            };
+            
+            const response = await fetch(`${API_URL}/api/contas/${idStr}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Session-Token': sessionToken,
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(updateData),
+                mode: 'cors',
+                credentials: 'include'
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Erro HTTP: ${response.status}`);
+            }
+            
+            const savedData = await response.json();
+            
+            // Atualizar array local
+            const index = contas.findIndex(c => String(c.id) === idStr);
+            if (index !== -1) {
+                contas[index] = savedData;
+                
+                // Mostrar toast apenas quando marcar como pago
+                if (novoStatus === 'PAGO') {
+                    showToast(`NF ${savedData.numero_nf} marcada como Paga ✓`, 'success');
+                }
+                
+                // Atualizar interface
+                updateDashboard();
+                filterContas();
+            }
+        } catch (error) {
+            console.error('❌ Erro ao atualizar status:', error);
+            showToast('Erro ao atualizar status', 'error');
+            
+            // Reverter checkbox em caso de erro
+            const checkbox = document.getElementById(`check-${idStr}`);
+            if (checkbox) {
+                checkbox.checked = !checkbox.checked;
+            }
+        }
+    }
+};
+
+// ============================================
+// TOAST NOTIFICATIONS
+// ============================================
+function showToast(message, type = 'info') {
+    const existingToast = document.querySelector('.toast');
+    if (existingToast) {
+        existingToast.remove();
+    }
+    
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    
+    const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
+    toast.innerHTML = `<span style="margin-right: 8px; font-weight: bold;">${icon}</span>${message}`;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => toast.classList.add('show'), 10);
+    
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
 }
 
 // ============================================
@@ -801,6 +925,7 @@ function renderContas(contasToRender) {
             <table>
                 <thead>
                     <tr>
+                        <th style="width: 50px; text-align: center;"></th>
                         <th>NF</th>
                         <th>Órgão</th>
                         <th>Vendedor</th>
@@ -819,8 +944,28 @@ function renderContas(contasToRender) {
                             return val;
                         };
                         
+                        // Determinar se deve mostrar checkbox
+                        const tiposPermitidos = ['ENVIO', 'SIMPLES_REMESSA'];
+                        const tipoNf = c.tipo_nf || 'ENVIO';
+                        const showCheckbox = tiposPermitidos.includes(tipoNf);
+                        const isPago = c.status === 'PAGO';
+                        const rowClass = isPago ? 'row-pago' : '';
+                        
                         return `
-                        <tr data-id="${c.id}">
+                        <tr class="${rowClass}" data-id="${c.id}">
+                            <td style="text-align: center; padding: 8px;">
+                                ${showCheckbox ? `
+                                <div class="checkbox-wrapper">
+                                    <input 
+                                        type="checkbox" 
+                                        id="check-${c.id}"
+                                        ${isPago ? 'checked' : ''}
+                                        class="styled-checkbox"
+                                    >
+                                    <label for="check-${c.id}" class="checkbox-label-styled"></label>
+                                </div>
+                                ` : ''}
+                            </td>
                             <td><strong>${c.numero_nf || '-'}</strong></td>
                             <td style="max-width: 200px; word-wrap: break-word; white-space: normal;">${c.orgao || '-'}</td>
                             <td>${displayValue(c.vendedor)}</td>
