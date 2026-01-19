@@ -1597,3 +1597,142 @@ button.small {
         max-width: 95%;
     }
 }
+/* ============================================
+   ESTILOS PARA CHECKBOXES
+   Adicione ao final do styles.css
+   ============================================ */
+
+/* Wrapper do checkbox */
+.checkbox-wrapper {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Input checkbox (escondido) */
+.styled-checkbox {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    width: 40px;
+    height: 40px;
+}
+
+/* Label customizado do checkbox */
+.checkbox-label-styled {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: var(--input-bg);
+}
+
+/* Hover no checkbox */
+.checkbox-label-styled:hover {
+    border-color: var(--primary);
+    background: rgba(204, 112, 0, 0.05);
+}
+
+/* Checkbox marcado */
+.styled-checkbox:checked + .checkbox-label-styled {
+    background: #10B981; /* Verde sucesso */
+    border-color: #10B981;
+}
+
+/* Ícone de check quando marcado */
+.styled-checkbox:checked + .checkbox-label-styled::after {
+    content: '✓';
+    color: white;
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+/* ============================================
+   ESTILO PARA LINHA PAGA
+   ============================================ */
+
+/* Linha com status PAGO */
+tr.row-pago {
+    background-color: rgba(16, 185, 129, 0.08) !important;
+    opacity: 0.75;
+}
+
+tr.row-pago:hover {
+    background-color: rgba(16, 185, 129, 0.12) !important;
+    opacity: 0.85;
+}
+
+/* Células da linha paga */
+tr.row-pago td {
+    color: var(--text-secondary);
+}
+
+/* NF e valores em negrito permanecem visíveis */
+tr.row-pago td strong {
+    color: var(--text-primary);
+}
+
+/* ============================================
+   TOAST NOTIFICATIONS
+   ============================================ */
+
+.toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    padding: 16px 24px;
+    border-radius: 8px;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.3s ease;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.toast-success {
+    background: #10B981;
+    color: white;
+}
+
+.toast-error {
+    background: #EF4444;
+    color: white;
+}
+
+.toast-info {
+    background: #3B82F6;
+    color: white;
+}
+
+/* ============================================
+   RESPONSIVIDADE DOS CHECKBOXES
+   ============================================ */
+
+@media (max-width: 768px) {
+    .checkbox-wrapper {
+        padding: 4px;
+    }
+    
+    .styled-checkbox,
+    .checkbox-label-styled {
+        width: 32px;
+        height: 32px;
+    }
+    
+    .checkbox-label-styled::after {
+        font-size: 0.85rem;
+    }
+}
