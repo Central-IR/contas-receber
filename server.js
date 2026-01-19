@@ -84,26 +84,46 @@ app.get('/api/health', (req, res) => {
 
 // GET /api/contas
 app.get('/api/contas', async (req, res) => {
+    console.log('📥 GET /api/contas requisitado');
+    console.log('   Headers:', req.headers);
+    console.log('   DEV_MODE:', DEV_MODE);
+    
     // Em modo dev, permitir sem autenticação
     if (!DEV_MODE) {
         const token = req.headers['x-session-token'];
         if (!token) {
+            console.log('❌ Token não fornecido');
             return res.status(401).json({ error: 'Token necessário' });
         }
         // TODO: validar token
     }
     
     try {
+        console.log('🔍 Buscando dados no Supabase...');
+        
         const { data, error } = await supabase
             .from('contas_receber')
             .select('*')
             .order('created_at', { ascending: false });
         
-        if (error) throw error;
+        if (error) {
+            console.error('❌ Erro Supabase:', error);
+            throw error;
+        }
+        
+        console.log(`✅ Dados retornados: ${data ? data.length : 0} registros`);
+        
+        if (data && data.length > 0) {
+            console.log('   Primeiro registro:', data[0].numero_nf);
+        }
         
         res.json(data || []);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('❌ Erro ao buscar contas:', error.message);
+        res.status(500).json({ 
+            error: error.message,
+            details: error.details || 'Sem detalhes adicionais'
+        });
     }
 });
 
