@@ -1,21 +1,32 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const app = express();
 
 // ============================================
-// MIDDLEWARE CORS - CONFIGURAÇÃO PROFISSIONAL
+// MIDDLEWARE CORS - MÁXIMA PERMISSIVIDADE
 // ============================================
 
-// Configuração CORS permissiva para aceitar qualquer origem
+// CORS TOTALMENTE ABERTO para aceitar de QUALQUER origem
 app.use(cors({
-    origin: true, // Aceita qualquer origem
+    origin: function (origin, callback) {
+        // Aceita requisições sem origin (como de apps mobile) ou de qualquer origem
+        callback(null, true);
+    },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-Token', 'Accept', 'Cache-Control'],
-    exposedHeaders: ['Content-Range', 'X-Content-Range'],
-    maxAge: 600,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-Token', 'Accept', 'Cache-Control', 'X-Requested-With'],
+    exposedHeaders: ['Content-Range', 'X-Content-Range', 'X-Total-Count'],
+    maxAge: 86400, // 24 horas
     optionsSuccessStatus: 200
 }));
+
+// Headers adicionais de segurança CORS
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    next();
+});
 
 // Middleware de logging
 app.use((req, res, next) => {
@@ -25,6 +36,9 @@ app.use((req, res, next) => {
 
 // Body parser
 app.use(express.json());
+
+// Servir arquivos estáticos ANTES das rotas da API
+app.use(express.static(path.join(__dirname, 'public')));
 
 // ============================================
 // CONFIGURAÇÃO SUPABASE
@@ -165,12 +179,20 @@ app.delete('/api/contas/:id', async (req, res) => {
     }
 });
 
-// Servir arquivos estáticos
-app.use(express.static('public'));
+// ============================================
+// ROTAS RAIZ - SERVIR FRONTEND
+// ============================================
 
-// Rota raiz
+// Rota raiz - servir index.html
 app.get('/', (req, res) => {
-    res.sendFile(__dirname + '/public/index.html');
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Fallback para SPA - qualquer rota não-API serve o index.html
+app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api')) {
+        res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    }
 });
 
 // ============================================
@@ -185,7 +207,8 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log('='.repeat(50));
     console.log(`Porta: ${PORT}`);
     console.log(`Modo Dev: ${DEV_MODE ? 'SIM ✅' : 'NÃO ❌'}`);
-    console.log(`CORS: TOTALMENTE ABERTO`);
+    console.log(`CORS: TOTALMENTE ABERTO - ACEITA QUALQUER ORIGEM`);
+    console.log(`Frontend: Servido da pasta /public`);
     console.log('='.repeat(50));
     console.log('');
 });
