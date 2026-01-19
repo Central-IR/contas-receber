@@ -1,24 +1,25 @@
 const express = require('express');
+const cors = require('cors');
 const app = express();
 
 // ============================================
-// MIDDLEWARE CORS - ABSOLUTAMENTE PRIMEIRO
+// MIDDLEWARE CORS - CONFIGURAÇÃO PROFISSIONAL
 // ============================================
+
+// Configuração CORS permissiva para aceitar qualquer origem
+app.use(cors({
+    origin: true, // Aceita qualquer origem
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-Token', 'Accept', 'Cache-Control'],
+    exposedHeaders: ['Content-Range', 'X-Content-Range'],
+    maxAge: 600,
+    optionsSuccessStatus: 200
+}));
+
+// Middleware de logging
 app.use((req, res, next) => {
     console.log(`${req.method} ${req.path} - Origin: ${req.headers.origin || 'sem origin'}`);
-    
-    // Headers CORS em TODAS as requisições
-    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Session-Token, Accept, Cache-Control');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    
-    // Se for OPTIONS, responder imediatamente
-    if (req.method === 'OPTIONS') {
-        console.log('→ Respondendo OPTIONS com 200');
-        return res.sendStatus(200);
-    }
-    
     next();
 });
 
