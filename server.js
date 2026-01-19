@@ -16,39 +16,46 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 console.log('✅ Supabase configurado:', supabaseUrl);
 
 // ============================================
-// CORS - CONFIGURAÇÃO CORRIGIDA
+// CORS - ULTRA PERMISSIVO (NUCLEAR OPTION)
 // ============================================
-app.use(cors({
-    origin: true, // Permite qualquer origem (use isto apenas em desenvolvimento!)
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-Token', 'Accept', 'Cache-Control'],
-    exposedHeaders: ['Content-Type', 'X-Session-Token'],
-    preflightContinue: false,
-    optionsSuccessStatus: 204
-}));
 
-// Headers adicionais para garantir CORS em todas as respostas
+// Middleware 1: Permitir tudo antes de qualquer rota
 app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Session-Token, Accept, Cache-Control');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', '*');
+    res.setHeader('Access-Control-Allow-Headers', '*');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
     
-    // Handle preflight
     if (req.method === 'OPTIONS') {
-        return res.sendStatus(204);
+        return res.status(200).end();
     }
     next();
 });
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true }));
+// Middleware 2: CORS package (redundante, mas garante)
+app.use(cors({
+    origin: '*',
+    credentials: true,
+    methods: '*',
+    allowedHeaders: '*',
+    optionsSuccessStatus: 200
+}));
 
-// Servir arquivos estáticos COM MIME TYPES CORRETOS
+// Middleware 3: JSON parser
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Middleware 4: Logs
+app.use((req, res, next) => {
+    console.log(`📥 ${req.method} ${req.path}`);
+    next();
+});
+
+// ============================================
+// SERVIR ARQUIVOS ESTÁTICOS
+// ============================================
 app.use(express.static(path.join(__dirname, 'public'), {
     setHeaders: (res, filepath) => {
-        // IMPORTANTE: Adicionar charset UTF-8
         if (filepath.endsWith('.js')) {
             res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
         } else if (filepath.endsWith('.css')) {
@@ -56,33 +63,27 @@ app.use(express.static(path.join(__dirname, 'public'), {
         } else if (filepath.endsWith('.html')) {
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
         }
-        // Cache control para desenvolvimento
-        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Cache-Control', 'no-cache');
     }
 }));
 
-app.use((req, res, next) => {
-    console.log(`📥 ${new Date().toISOString()} - ${req.method} ${req.path}`);
-    next();
-});
-
-// AUTENTICAÇÃO
+// ============================================
+// AUTENTICAÇÃO (DESABILITADA EM DEV)
+// ============================================
+const DEVELOPMENT_MODE = true;
 const PORTAL_URL = process.env.PORTAL_URL || 'https://ir-comercio-portal-zcan.onrender.com';
 
 async function verificarAutenticacao(req, res, next) {
     const publicPaths = ['/', '/health', '/diagnostico.html'];
     if (publicPaths.includes(req.path)) return next();
 
-    // FORÇAR MODO DESENVOLVIMENTO - DESABILITAR PARA PRODUÇÃO
-    const DEVELOPMENT_MODE = true; // SEMPRE TRUE = SEM AUTENTICAÇÃO
     if (DEVELOPMENT_MODE) {
-        console.log('⚠️ MODO DESENVOLVIMENTO - Autenticação desabilitada');
+        console.log('⚠️ MODO DEV - Autenticação desabilitada');
         return next();
     }
 
     const sessionToken = req.headers['x-session-token'];
     if (!sessionToken) {
-        console.log('❌ Token não fornecido');
         return res.status(401).json({ error: 'Não autenticado' });
     }
 
@@ -94,27 +95,28 @@ async function verificarAutenticacao(req, res, next) {
         });
 
         if (!verifyResponse.ok) {
-            console.log('❌ Sessão inválida - Status:', verifyResponse.status);
             return res.status(401).json({ error: 'Sessão inválida' });
         }
 
         const sessionData = await verifyResponse.json();
         if (!sessionData.valid) {
-            console.log('❌ Sessão não válida');
             return res.status(401).json({ error: 'Sessão inválida' });
         }
 
         req.user = sessionData.session;
         req.sessionToken = sessionToken;
-        console.log('✅ Autenticação OK');
         next();
     } catch (error) {
-        console.error('❌ Erro ao verificar autenticação:', error.message);
-        return res.status(500).json({ error: 'Erro ao verificar autenticação', details: error.message });
+        console.error('❌ Erro na autenticação:', error.message);
+        return res.status(500).json({ error: 'Erro ao verificar autenticação' });
     }
 }
 
+// ============================================
 // ROTAS DA API
+// ============================================
+
+// GET /api/contas - Listar todas as contas
 app.get('/api/contas', verificarAutenticacao, async (req, res) => {
     try {
         console.log('📋 Listando contas...');
@@ -123,15 +125,12 @@ app.get('/api/contas', verificarAutenticacao, async (req, res) => {
             .select('*')
             .order('created_at', { ascending: false });
 
-        if (error) {
-            console.error('❌ Erro Supabase ao listar:', error);
-            throw error;
-        }
+        if (error) throw error;
         
         console.log(`✅ ${data?.length || 0} contas encontradas`);
         res.json(data || []);
     } catch (error) {
-        console.error('❌ Erro ao listar contas:', error.message);
+        console.error('❌ Erro:', error.message);
         res.status(500).json({ 
             success: false, 
             error: 'Erro ao listar contas',
@@ -140,6 +139,7 @@ app.get('/api/contas', verificarAutenticacao, async (req, res) => {
     }
 });
 
+// GET /api/contas/:id - Buscar conta por ID
 app.get('/api/contas/:id', verificarAutenticacao, async (req, res) => {
     try {
         console.log(`🔍 Buscando conta ID: ${req.params.id}`);
@@ -151,7 +151,6 @@ app.get('/api/contas/:id', verificarAutenticacao, async (req, res) => {
 
         if (error) {
             if (error.code === 'PGRST116') {
-                console.log('❌ Conta não encontrada');
                 return res.status(404).json({ success: false, error: 'Conta não encontrada' });
             }
             throw error;
@@ -160,7 +159,7 @@ app.get('/api/contas/:id', verificarAutenticacao, async (req, res) => {
         console.log('✅ Conta encontrada');
         res.json(data);
     } catch (error) {
-        console.error('❌ Erro ao buscar conta:', error.message);
+        console.error('❌ Erro:', error.message);
         res.status(500).json({ 
             success: false, 
             error: 'Erro ao buscar conta',
@@ -169,27 +168,22 @@ app.get('/api/contas/:id', verificarAutenticacao, async (req, res) => {
     }
 });
 
+// POST /api/contas - Criar nova conta
 app.post('/api/contas', verificarAutenticacao, async (req, res) => {
     try {
-        console.log('➕ Criando nova conta...');
-        
-        const contaData = req.body;
-
+        console.log('➕ Criando conta...');
         const { data, error } = await supabase
             .from('contas_receber')
-            .insert([contaData])
+            .insert([req.body])
             .select()
             .single();
 
-        if (error) {
-            console.error('❌ Erro Supabase ao inserir:', error);
-            throw error;
-        }
+        if (error) throw error;
 
-        console.log('✅ Conta criada com sucesso! ID:', data.id);
+        console.log('✅ Conta criada! ID:', data.id);
         res.status(201).json(data);
     } catch (error) {
-        console.error('❌ Erro ao criar conta:', error);
+        console.error('❌ Erro:', error);
         res.status(500).json({ 
             success: false, 
             error: 'Erro ao criar conta',
@@ -198,12 +192,12 @@ app.post('/api/contas', verificarAutenticacao, async (req, res) => {
     }
 });
 
+// PUT /api/contas/:id - Atualizar conta
 app.put('/api/contas/:id', verificarAutenticacao, async (req, res) => {
     try {
         console.log(`✏️ Atualizando conta ID: ${req.params.id}`);
         
-        const contaData = req.body;
-        contaData.updated_at = new Date().toISOString();
+        const contaData = { ...req.body, updated_at: new Date().toISOString() };
 
         const { data, error } = await supabase
             .from('contas_receber')
@@ -219,10 +213,10 @@ app.put('/api/contas/:id', verificarAutenticacao, async (req, res) => {
             throw error;
         }
 
-        console.log('✅ Conta atualizada com sucesso!');
+        console.log('✅ Conta atualizada!');
         res.json(data);
     } catch (error) {
-        console.error('❌ Erro ao atualizar conta:', error.message);
+        console.error('❌ Erro:', error.message);
         res.status(500).json({ 
             success: false, 
             error: 'Erro ao atualizar conta',
@@ -231,6 +225,7 @@ app.put('/api/contas/:id', verificarAutenticacao, async (req, res) => {
     }
 });
 
+// DELETE /api/contas/:id - Deletar conta
 app.delete('/api/contas/:id', verificarAutenticacao, async (req, res) => {
     try {
         console.log(`🗑️ Deletando conta ID: ${req.params.id}`);
@@ -241,10 +236,10 @@ app.delete('/api/contas/:id', verificarAutenticacao, async (req, res) => {
 
         if (error) throw error;
 
-        console.log('✅ Conta deletada com sucesso!');
+        console.log('✅ Conta deletada!');
         res.json({ success: true, message: 'Conta removida com sucesso' });
     } catch (error) {
-        console.error('❌ Erro ao deletar conta:', error.message);
+        console.error('❌ Erro:', error.message);
         res.status(500).json({ 
             success: false, 
             error: 'Erro ao deletar conta',
@@ -253,18 +248,29 @@ app.delete('/api/contas/:id', verificarAutenticacao, async (req, res) => {
     }
 });
 
-// ROTAS DE SAÚDE
+// ============================================
+// ROTAS ESPECIAIS
+// ============================================
+
+// Health check
 app.get('/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.json({ 
+        status: 'ok', 
+        timestamp: new Date().toISOString(),
+        cors: 'WIDE OPEN'
+    });
 });
 
+// Index
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// TRATAMENTO GLOBAL DE ERROS
+// ============================================
+// ERROR HANDLER
+// ============================================
 app.use((err, req, res, next) => {
-    console.error('❌ Erro não tratado:', err);
+    console.error('❌ Erro global:', err);
     res.status(500).json({
         success: false,
         error: 'Erro interno do servidor',
@@ -272,19 +278,22 @@ app.use((err, req, res, next) => {
     });
 });
 
-// INICIAR SERVIDOR
+// ============================================
+// START SERVER
+// ============================================
 const PORT = process.env.PORT || 10000;
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log('');
     console.log('===============================================');
-    console.log('🚀 CONTAS A RECEBER');
+    console.log('🚀 CONTAS A RECEBER - ULTRA PERMISSIVE MODE');
     console.log('===============================================');
     console.log(`✅ Porta: ${PORT}`);
     console.log(`✅ Supabase: ${supabaseUrl}`);
     console.log(`✅ Portal: ${PORTAL_URL}`);
-    console.log('⚠️  MODO DESENVOLVIMENTO ATIVO - SEM AUTENTICAÇÃO');
-    console.log('⚠️  CORS ABERTO - Todas as origens permitidas');
+    console.log('⚠️  MODO DESENVOLVIMENTO ATIVO');
+    console.log('⚠️  CORS TOTALMENTE ABERTO (*)');
+    console.log('⚠️  SEM AUTENTICAÇÃO');
     console.log('===============================================');
 });
 
