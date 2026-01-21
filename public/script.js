@@ -3,7 +3,7 @@
 // ============================================
 const DEVELOPMENT_MODE = false;
 const PORTAL_URL = 'https://ir-comercio-portal-zcan.onrender.com';
-const API_URL = 'https://contas-receber-api.onrender.com/api';
+const API_URL = 'https://contas-receber-m1xw.onrender.com/api';
 
 let contas = [];
 let isOnline = false;
@@ -234,14 +234,24 @@ window.closeViewModal = function() {
 };
 
 // ============================================
-// AUTENTICAÇÃO
+// AUTENTICAÇÃO - CORRIGIDO PARA IFRAME
 // ============================================
 async function verificarAutenticacao() {
     const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('token');
+    const token = urlParams.get('token') || urlParams.get('sessionToken');
     
     if (!token) {
-        console.log('❌ Token não encontrado, redirecionando...');
+        console.log('❌ Token não encontrado');
+        
+        // Se estiver rodando em iframe (dentro do portal), não redireciona
+        if (window.self !== window.top) {
+            console.log('⚠️ Rodando em iframe, aguardando token do portal...');
+            showToast('Aguardando autenticação...', 'info');
+            return;
+        }
+        
+        // Se não estiver em iframe, redireciona para o portal
+        console.log('🔄 Redirecionando para o portal...');
         window.location.href = PORTAL_URL;
         return;
     }
