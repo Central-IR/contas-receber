@@ -84,7 +84,7 @@ app.get('/api/health', (req, res) => {
 
 // GET /api/contas
 app.get('/api/contas', async (req, res) => {
-    console.log('📥 GET /api/contas requisitado');
+    console.log('🔥 GET /api/contas requisitado');
     console.log('   Headers:', req.headers);
     console.log('   DEV_MODE:', DEV_MODE);
     
@@ -176,6 +176,31 @@ app.put('/api/contas/:id', async (req, res) => {
     }
 });
 
+// PATCH /api/contas/:id
+app.patch('/api/contas/:id', async (req, res) => {
+    if (!DEV_MODE) {
+        const token = req.headers['x-session-token'];
+        if (!token) {
+            return res.status(401).json({ error: 'Token necessário' });
+        }
+    }
+    
+    try {
+        const { data, error } = await supabase
+            .from('contas_receber')
+            .update({ ...req.body, updated_at: new Date().toISOString() })
+            .eq('id', req.params.id)
+            .select()
+            .single();
+        
+        if (error) throw error;
+        
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // DELETE /api/contas/:id
 app.delete('/api/contas/:id', async (req, res) => {
     if (!DEV_MODE) {
@@ -223,7 +248,7 @@ const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log('');
     console.log('='.repeat(50));
-    console.log('🚀 SERVIDOR INICIADO');
+    console.log('🚀 SERVIDOR CONTAS A RECEBER INICIADO');
     console.log('='.repeat(50));
     console.log(`Porta: ${PORT}`);
     console.log(`Modo Dev: ${DEV_MODE ? 'SIM ✅' : 'NÃO ❌'}`);
