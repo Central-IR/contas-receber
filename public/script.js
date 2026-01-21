@@ -2,16 +2,12 @@
 // CONFIGURAÇÃO
 // ============================================
 const DEVELOPMENT_MODE = false;
-
-// Auto-detectar a URL da API baseado no ambiente
-const API_URL = window.location.hostname === 'localhost' 
-    ? 'http://localhost:10000'  // Desenvolvimento local
-    : window.location.origin;    // Produção - mesma origem
-
 const PORTAL_URL = 'https://ir-comercio-portal-zcan.onrender.com';
+const API_URL = 'https://contas-receber-api.onrender.com/api';
 
 let contas = [];
 let isOnline = false;
+let lastDataHash = '';
 let sessionToken = null;
 let currentMonth = new Date();
 
@@ -22,86 +18,7 @@ const meses = [
 
 console.log('✅ Contas a Receber iniciado');
 console.log('📍 API URL:', API_URL);
-console.log('🌍 Origin:', window.location.origin);
 console.log('🔧 Modo desenvolvimento:', DEVELOPMENT_MODE);
-
-// ============================================
-// CALENDAR - INTEGRADO NO SCRIPT PRINCIPAL
-// ============================================
-let calendarYear = new Date().getFullYear();
-
-window.toggleCalendar = function() {
-    const modal = document.getElementById('calendarModal');
-    if (!modal) return;
-    
-    if (modal.classList.contains('show')) {
-        modal.classList.remove('show');
-    } else {
-        calendarYear = currentMonth.getFullYear();
-        renderCalendar();
-        modal.classList.add('show');
-    }
-};
-
-window.changeCalendarYear = function(direction) {
-    calendarYear += direction;
-    renderCalendar();
-};
-
-function renderCalendar() {
-    const yearElement = document.getElementById('calendarYear');
-    const monthsContainer = document.getElementById('calendarMonths');
-    
-    if (!yearElement || !monthsContainer) return;
-    
-    yearElement.textContent = calendarYear;
-    
-    const currentYear = currentMonth.getFullYear();
-    const currentMonthIndex = currentMonth.getMonth();
-    
-    monthsContainer.innerHTML = meses.map((month, index) => {
-        const isCurrent = calendarYear === currentYear && index === currentMonthIndex;
-        return `
-            <div class="calendar-month ${isCurrent ? 'current' : ''}" 
-                 onclick="selectMonth(${index})">
-                ${month}
-            </div>
-        `;
-    }).join('');
-}
-
-window.selectMonth = function(monthIndex) {
-    currentMonth = new Date(calendarYear, monthIndex, 1);
-    updateDisplay();
-    toggleCalendar();
-};
-
-// Fechar modal ao clicar fora
-document.addEventListener('click', function(event) {
-    const modal = document.getElementById('calendarModal');
-    if (!modal) return;
-    
-    const calendarContent = modal.querySelector('.calendar-content');
-    const calendarBtn = event.target.closest('.calendar-btn[onclick="toggleCalendar()"]');
-    
-    if (modal.classList.contains('show') && 
-        !calendarContent?.contains(event.target) && 
-        !calendarBtn) {
-        toggleCalendar();
-    }
-});
-
-// Fechar modal com ESC
-document.addEventListener('keydown', function(event) {
-    const modal = document.getElementById('calendarModal');
-    if (!modal) return;
-    
-    if (event.key === 'Escape' && modal.classList.contains('show')) {
-        toggleCalendar();
-    }
-});
-
-console.log('✅ Calendar integrado carregado');
 
 // ============================================
 // INICIALIZAÇÃO
@@ -118,31 +35,38 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(setupEventDelegation, 100);
 });
 
+// ============================================
+// EVENT DELEGATION
+// ============================================
 function setupEventDelegation() {
     console.log('🔧 Configurando Event Delegation...');
     console.log('✅ Event Delegation configurado');
 }
 
 // ============================================
-// HANDLERS DE EVENTOS (EXPOSTOS GLOBALMENTE)
+// HANDLERS DE EVENTOS
 // ============================================
 window.handleViewClick = function(id) {
     console.log('👁️ Visualizar conta:', id);
+    
     const conta = contas.find(c => String(c.id) === String(id));
     if (!conta) {
         showToast('Conta não encontrada!', 'error');
         return;
     }
+    
     mostrarModalVisualizacao(conta);
 };
 
 window.handleEditClick = function(id) {
     console.log('✏️ Editar conta:', id);
+    
     const conta = contas.find(c => String(c.id) === String(id));
     if (!conta) {
         showToast('Conta não encontrada!', 'error');
         return;
     }
+    
     showFormModal(String(id));
 };
 
@@ -164,16 +88,14 @@ window.handleDeleteClick = function(id) {
     
     console.log('🗑️ Deletando NF:', numeroNF);
     
-    // Remove localmente
     contas = contas.filter(c => String(c.id) !== idStr);
     updateAllFilters();
     updateDashboard();
     filterContas();
     showToast(`NF ${numeroNF} Excluído`, 'success');
     
-    // Remove no servidor
     if (isOnline || DEVELOPMENT_MODE) {
-        fetch(`${API_URL}/api/contas/${idStr}`, {
+        fetch(`${API_URL}/contas/${idStr}`, {
             method: 'DELETE',
             headers: {
                 'X-Session-Token': sessionToken,
@@ -232,755 +154,340 @@ function mostrarModalVisualizacao(conta) {
     const modalHTML = `
         <div class="modal-overlay" id="viewModal" style="display: flex;">
             <div class="modal-content">
+                <button class="modal-close-x" onclick="closeViewModal()" title="Fechar">✕</button>
                 <div class="modal-header">
                     <h3 class="modal-title">Detalhes da Conta</h3>
-                    <button class="close-modal" onclick="closeViewModal()">✕</button>
                 </div>
-                
-                <div class="tabs-container">
-                    <div class="tabs-nav">
-                        <button class="tab-btn active" onclick="switchViewTab(0)">Dados da Conta</button>
-                        <button class="tab-btn" onclick="switchViewTab(1)">Pagamento</button>
-                        <button class="tab-btn" onclick="switchViewTab(2)">Observações</button>
-                    </div>
-
-                    <div class="tab-content active" id="view-tab-dados">
-                        <div class="info-section">
-                            <h4>Informações Gerais</h4>
-                            <p><strong>Número NF:</strong> ${conta.numero_nf || '-'}</p>
-                            <p><strong>Órgão:</strong> ${conta.orgao || '-'}</p>
-                            <p><strong>Vendedor:</strong> ${displayValue(conta.vendedor)}</p>
-                            <p><strong>Banco:</strong> ${displayValue(conta.banco)}</p>
-                            <p><strong>Valor:</strong> R$ ${conta.valor ? parseFloat(conta.valor).toFixed(2) : '0,00'}</p>
-                            <p><strong>Tipo NF:</strong> ${getTipoNfLabel(conta.tipo_nf)}</p>
+                <div class="modal-body">
+                    <div class="view-grid">
+                        <div class="view-item">
+                            <span class="view-label">Nº NF</span>
+                            <span class="view-value"><strong>${conta.numero_nf || '-'}</strong></span>
+                        </div>
+                        <div class="view-item">
+                            <span class="view-label">Órgão</span>
+                            <span class="view-value">${displayValue(conta.orgao)}</span>
+                        </div>
+                        <div class="view-item">
+                            <span class="view-label">Vendedor</span>
+                            <span class="view-value">${displayValue(conta.vendedor)}</span>
+                        </div>
+                        <div class="view-item">
+                            <span class="view-label">Banco</span>
+                            <span class="view-value">${displayValue(conta.banco)}</span>
+                        </div>
+                        <div class="view-item">
+                            <span class="view-label">Valor</span>
+                            <span class="view-value"><strong>R$ ${conta.valor ? parseFloat(conta.valor).toFixed(2) : '0,00'}</strong></span>
+                        </div>
+                        <div class="view-item">
+                            <span class="view-label">Data Emissão</span>
+                            <span class="view-value">${formatDate(conta.data_emissao)}</span>
+                        </div>
+                        <div class="view-item">
+                            <span class="view-label">Data Vencimento</span>
+                            <span class="view-value">${formatDate(conta.data_vencimento)}</span>
+                        </div>
+                        <div class="view-item">
+                            <span class="view-label">Data Pagamento</span>
+                            <span class="view-value">${formatDate(conta.data_pagamento)}</span>
+                        </div>
+                        <div class="view-item">
+                            <span class="view-label">Status</span>
+                            <span class="view-value">${getStatusBadge(conta.status)}</span>
+                        </div>
+                        <div class="view-item">
+                            <span class="view-label">Tipo NF</span>
+                            <span class="view-value">${getTipoNfLabel(conta.tipo_nf)}</span>
                         </div>
                     </div>
 
-                    <div class="tab-content" id="view-tab-pagamento">
-                        <div class="info-section">
-                            <h4>Dados de Pagamento</h4>
-                            <p><strong>Data Emissão:</strong> ${conta.data_emissao ? formatDate(conta.data_emissao) : '-'}</p>
-                            <p><strong>Data Vencimento:</strong> ${conta.data_vencimento ? formatDate(conta.data_vencimento) : '-'}</p>
-                            <p><strong>Data Pagamento:</strong> ${conta.data_pagamento ? formatDate(conta.data_pagamento) : '-'}</p>
-                            <p><strong>Status:</strong> ${getStatusBadge(conta.status)}</p>
-                        </div>
-                    </div>
-
-                    <div class="tab-content" id="view-tab-observacoes">
-                        <div class="info-section">
-                            <h4>Observações</h4>
-                            <div class="observacoes-list-view">
-                                ${observacoesHTML}
-                            </div>
+                    <div class="observacoes-section">
+                        <h4 class="observacoes-title">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                <polyline points="10 9 9 9 8 9"></polyline>
+                            </svg>
+                            Observações
+                        </h4>
+                        <div class="observacoes-list">
+                            ${observacoesHTML}
                         </div>
                     </div>
                 </div>
-
                 <div class="modal-actions">
-                    <button class="secondary" onclick="closeViewModal()">Fechar</button>
+                    <button type="button" onclick="closeViewModal()" class="btn-secondary">Fechar</button>
                 </div>
             </div>
         </div>
     `;
-
-    const existingModal = document.getElementById('viewModal');
-    if (existingModal) existingModal.remove();
     
     document.body.insertAdjacentHTML('beforeend', modalHTML);
 }
 
 window.closeViewModal = function() {
     const modal = document.getElementById('viewModal');
-    if (modal) {
-        modal.style.animation = 'fadeOut 0.2s ease forwards';
-        setTimeout(() => modal.remove(), 200);
-    }
-};
-
-window.switchViewTab = function(index) {
-    document.querySelectorAll('#viewModal .tab-btn').forEach((btn, i) => {
-        btn.classList.toggle('active', i === index);
-    });
-    
-    document.querySelectorAll('#viewModal .tab-content').forEach((content, i) => {
-        content.classList.toggle('active', i === index);
-    });
+    if (modal) modal.remove();
 };
 
 // ============================================
 // AUTENTICAÇÃO
 // ============================================
-function verificarAutenticacao() {
+async function verificarAutenticacao() {
     const urlParams = new URLSearchParams(window.location.search);
-    const tokenFromUrl = urlParams.get('sessionToken');
-
-    if (tokenFromUrl) {
-        sessionToken = tokenFromUrl;
-        sessionStorage.setItem('contasReceberSession', tokenFromUrl);
-        window.history.replaceState({}, document.title, window.location.pathname);
-    } else {
-        sessionToken = sessionStorage.getItem('contasReceberSession');
-    }
-
-    if (!sessionToken) {
-        mostrarTelaAcessoNegado();
+    const token = urlParams.get('token');
+    
+    if (!token) {
+        console.log('❌ Token não encontrado, redirecionando...');
+        window.location.href = PORTAL_URL;
         return;
     }
-
+    
+    sessionToken = token;
+    console.log('✅ Token recebido:', token.substring(0, 20) + '...');
+    
     inicializarApp();
 }
 
-function mostrarTelaAcessoNegado(mensagem = 'NÃO AUTORIZADO') {
-    document.body.innerHTML = `
-        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: var(--bg-primary); color: var(--text-primary); text-align: center; padding: 2rem;">
-            <h1 style="font-size: 2.2rem; margin-bottom: 1rem;">${mensagem}</h1>
-            <p style="color: var(--text-secondary); margin-bottom: 2rem;">Somente usuários autenticados podem acessar esta área.</p>
-            <a href="${PORTAL_URL}" style="display: inline-block; background: var(--btn-register); color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600;">Ir para o Portal</a>
-        </div>
-    `;
-}
-
+// ============================================
+// INICIALIZAR APP
+// ============================================
 function inicializarApp() {
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-            inicializarApp();
-        });
-        return;
-    }
+    console.log('🚀 Inicializando aplicação...');
     
-    setupEventDelegation(); // ← NOVO
-    updateDisplay();
-    checkServerStatus();
-    setInterval(checkServerStatus, 15000);
-    startPolling();
-}
-
-// ============================================
-// EVENT DELEGATION PARA CHECKBOXES
-// ============================================
-function setupEventDelegation() {
-    document.body.addEventListener('change', function(e) {
-        if (e.target.type === 'checkbox' && e.target.classList.contains('styled-checkbox')) {
-            const row = e.target.closest('tr[data-id]');
-            if (row) {
-                const id = row.getAttribute('data-id');
-                console.log('☑️ Checkbox alterado - ID:', id);
-                window.handleCheckboxChange(id);
-            }
+    initCalendar();
+    updateMonthDisplay();
+    carregarContas();
+    
+    setInterval(() => {
+        if (isOnline || DEVELOPMENT_MODE) {
+            carregarContas();
         }
-    });
-    
-    console.log('✅ Event Delegation configurado');
+    }, 30000);
 }
 
 // ============================================
-// HANDLER DE CHECKBOX - MARCAR COMO PAGO
+// CARREGAR CONTAS
 // ============================================
-window.handleCheckboxChange = async function(id) {
-    console.log('☑️ Checkbox alterado:', id);
-    
-    const idStr = String(id);
-    const conta = contas.find(c => String(c.id) === idStr);
-    
-    if (!conta) {
-        console.error('Conta não encontrada:', id);
-        return;
-    }
-    
-    // Tipos permitidos para marcar como pago
-    const tiposPermitidos = ['ENVIO', 'SIMPLES_REMESSA'];
-    const tipoNf = conta.tipo_nf || 'ENVIO';
-    
-    if (!tiposPermitidos.includes(tipoNf)) {
-        console.log('Tipo de NF não permite marcação:', tipoNf);
-        return;
-    }
-    
-    // Toggle entre PAGO e PENDENTE
-    const novoStatus = conta.status === 'PAGO' ? 'PENDENTE' : 'PAGO';
-    const dataPagamento = novoStatus === 'PAGO' ? new Date().toISOString().split('T')[0] : null;
-    
-    if (isOnline || DEVELOPMENT_MODE) {
-        try {
-            const updateData = {
-                status: novoStatus,
-                data_pagamento: dataPagamento,
-                updated_at: new Date().toISOString()
-            };
-            
-            const response = await fetch(`${API_URL}/api/contas/${idStr}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Session-Token': sessionToken,
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify(updateData),
-                mode: 'cors',
-                credentials: 'include'
-            });
-            
-            if (!response.ok) {
-                throw new Error(`Erro HTTP: ${response.status}`);
-            }
-            
-            const savedData = await response.json();
-            
-            // Atualizar array local
-            const index = contas.findIndex(c => String(c.id) === idStr);
-            if (index !== -1) {
-                contas[index] = savedData;
-                
-                // Mostrar toast apenas quando marcar como pago
-                if (novoStatus === 'PAGO') {
-                    showToast(`NF ${savedData.numero_nf} marcada como Paga ✓`, 'success');
-                }
-                
-                // Atualizar interface
-                updateDashboard();
-                filterContas();
-            }
-        } catch (error) {
-            console.error('❌ Erro ao atualizar status:', error);
-            showToast('Erro ao atualizar status', 'error');
-            
-            // Reverter checkbox em caso de erro
-            const checkbox = document.getElementById(`check-${idStr}`);
-            if (checkbox) {
-                checkbox.checked = !checkbox.checked;
-            }
-        }
-    }
-};
-
-// ============================================
-// TOAST NOTIFICATIONS
-// ============================================
-function showToast(message, type = 'info') {
-    const existingToast = document.querySelector('.toast');
-    if (existingToast) {
-        existingToast.remove();
-    }
-    
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    
-    const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
-    toast.innerHTML = `<span style="margin-right: 8px; font-weight: bold;">${icon}</span>${message}`;
-    
-    document.body.appendChild(toast);
-    
-    setTimeout(() => toast.classList.add('show'), 10);
-    
-    setTimeout(() => {
-        toast.classList.remove('show');
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
-}
-
-// ============================================
-// CONEXÃO E STATUS
-// ============================================
-async function checkServerStatus() {
+async function carregarContas() {
     try {
-        const headers = {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-        };
+        console.log('📥 Carregando contas...');
         
-        if (!DEVELOPMENT_MODE && sessionToken) {
-            headers['X-Session-Token'] = sessionToken;
-        }
-
-        const response = await fetch(`${API_URL}/api/contas`, {
-            method: 'GET',
-            headers: headers,
-            mode: 'cors',
-            credentials: 'include'
-        });
-
-        if (!DEVELOPMENT_MODE && response.status === 401) {
-            sessionStorage.removeItem('contasReceberSession');
-            mostrarTelaAcessoNegado('Sua sessão expirou');
-            return false;
-        }
-
-        const wasOffline = !isOnline;
-        isOnline = response.ok;
-        
-        if (wasOffline && isOnline) {
-            console.log('✅ Servidor ONLINE');
-            await loadContas();
-        }
-        
-        updateConnectionStatus();
-        return isOnline;
-    } catch (error) {
-        console.error('❌ Erro ao verificar servidor:', error);
-        isOnline = false;
-        updateConnectionStatus();
-        return false;
-    }
-}
-
-function updateConnectionStatus() {
-    const statusElement = document.getElementById('connectionStatus');
-    if (statusElement) {
-        statusElement.className = isOnline ? 'connection-status online' : 'connection-status offline';
-    }
-}
-
-// ============================================
-// CARREGAMENTO DE DADOS
-// ============================================
-async function loadContas(showMessage = false) {
-    if (!isOnline && !DEVELOPMENT_MODE) {
-        if (showMessage) {
-            showToast('Sistema offline. Não foi possível sincronizar.', 'error');
-        }
-        return;
-    }
-
-    try {
-        const timestamp = new Date().getTime();
-        const response = await fetch(`${API_URL}/api/contas?_t=${timestamp}`, {
-            method: 'GET',
-            headers: { 
+        const response = await fetch(`${API_URL}/contas`, {
+            headers: {
                 'X-Session-Token': sessionToken,
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-                'Cache-Control': 'no-cache'
+                'Accept': 'application/json'
             },
-            mode: 'cors',
-            credentials: 'include'
+            mode: 'cors'
         });
-
-        if (!DEVELOPMENT_MODE && response.status === 401) {
-            sessionStorage.removeItem('contasReceberSession');
-            mostrarTelaAcessoNegado('Sua sessão expirou');
-            return;
-        }
-
-        if (!response.ok) {
-            if (showMessage) {
-                showToast('Erro ao sincronizar dados', 'error');
-            }
-            return;
-        }
-
+        
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        
         const data = await response.json();
+        console.log('✅ Contas carregadas:', data.length);
+        
         contas = data;
         
-        console.log(`✅ ${contas.length} contas carregadas`);
-        
+        updateConnectionStatus(true);
         updateAllFilters();
         updateDashboard();
         filterContas();
         
     } catch (error) {
-        console.error('❌ Erro ao carregar:', error);
-        if (showMessage) {
-            showToast('Erro ao sincronizar dados', 'error');
+        console.error('❌ Erro ao carregar contas:', error);
+        updateConnectionStatus(false);
+        showToast('Erro ao carregar contas', 'error');
+    }
+}
+
+// ============================================
+// ATUALIZAR STATUS DE CONEXÃO
+// ============================================
+function updateConnectionStatus(online) {
+    isOnline = online;
+    const statusElement = document.getElementById('connectionStatus');
+    
+    if (statusElement) {
+        if (online) {
+            statusElement.classList.remove('offline');
+            statusElement.classList.add('online');
+        } else {
+            statusElement.classList.remove('online');
+            statusElement.classList.add('offline');
         }
     }
 }
 
+// ============================================
+// SINCRONIZAR DADOS
+// ============================================
 window.sincronizarDados = async function() {
-    console.log('🔄 Sincronizando dados...');
-    
-    const syncButtons = document.querySelectorAll('button[onclick="sincronizarDados()"]');
-    syncButtons.forEach(btn => {
-        const svg = btn.querySelector('svg');
-        if (svg) {
-            svg.style.animation = 'spin 1s linear infinite';
-        }
-    });
-    
+    showToast('Sincronizando...', 'info');
+    await carregarContas();
     showToast('Dados sincronizados', 'success');
-    await loadContas(true);
-    
-    setTimeout(() => {
-        syncButtons.forEach(btn => {
-            const svg = btn.querySelector('svg');
-            if (svg) {
-                svg.style.animation = '';
-            }
-        });
-    }, 1000);
-};
-
-function startPolling() {
-    loadContas();
-    setInterval(() => {
-        if (isOnline) loadContas();
-    }, 10000);
-}
-
-// ============================================
-// NAVEGAÇÃO POR MESES
-// ============================================
-function updateDisplay() {
-    const display = document.getElementById('currentMonth');
-    if (display) {
-        display.textContent = `${meses[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`;
-    }
-    updateDashboard();
-    filterContas();
-}
-
-window.changeMonth = function(direction) {
-    currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + direction, 1);
-    updateDisplay();
 };
 
 // ============================================
-// DASHBOARD ATUALIZADO
+// ATUALIZAR DASHBOARD
 // ============================================
 function updateDashboard() {
-    const statPago = document.getElementById('statPago');
-    const statVencido = document.getElementById('statVencido');
-    const statReceber = document.getElementById('statReceber');
-    const statFaturado = document.getElementById('statFaturado');
-    
-    if (!statPago || !statVencido || !statReceber || !statFaturado) {
-        console.warn('⚠️ Elementos do dashboard não encontrados');
-        return;
-    }
-    
-    const contasMesAtual = contas.filter(c => {
-        const data = new Date(c.data_vencimento);
-        return data.getMonth() === currentMonth.getMonth() && data.getFullYear() === currentMonth.getFullYear();
-    });
-
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
     
-    // Total Pago
-    const totalPago = contasMesAtual
-        .filter(c => c.status === 'PAGO')
-        .reduce((sum, c) => sum + parseFloat(c.valor || 0), 0);
+    let totalPago = 0;
+    let totalVencido = 0;
+    let totalFaturado = 0;
     
-    // Total Vencido (pendente + data vencimento menor que hoje)
-    const totalVencido = contasMesAtual
-        .filter(c => {
-            if (c.status === 'PAGO') return false;
-            if (!c.data_vencimento) return false;
-            const venc = new Date(c.data_vencimento);
-            venc.setHours(0, 0, 0, 0);
-            return venc <= hoje;
-        })
-        .reduce((sum, c) => sum + parseFloat(c.valor || 0), 0);
+    contas.forEach(conta => {
+        const valor = parseFloat(conta.valor) || 0;
+        
+        // Faturado: todas as contas
+        totalFaturado += valor;
+        
+        // Pago: status PAGO
+        if (conta.status === 'PAGO') {
+            totalPago += valor;
+        }
+        
+        // Vencido: não pago e data vencimento menor que hoje
+        if (conta.status !== 'PAGO' && conta.data_vencimento) {
+            const dataVenc = new Date(conta.data_vencimento + 'T00:00:00');
+            dataVenc.setHours(0, 0, 0, 0);
+            
+            if (dataVenc < hoje) {
+                totalVencido += valor;
+            }
+        }
+    });
     
-    // Total Faturado
-    const totalFaturado = contasMesAtual
-        .reduce((sum, c) => sum + parseFloat(c.valor || 0), 0);
-    
-    // A Receber = Total Faturado - Total Pago
+    // A Receber = Faturado - Pago
     const totalReceber = totalFaturado - totalPago;
     
-    statPago.textContent = `R$ ${totalPago.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-    statVencido.textContent = `R$ ${totalVencido.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-    statReceber.textContent = `R$ ${totalReceber.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-    statFaturado.textContent = `R$ ${totalFaturado.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-    
-    // Badge de alerta para vencidos
-    const cardVencido = document.getElementById('cardVencido');
-    if (!cardVencido) return;
-    
-    let pulseBadge = cardVencido.querySelector('.pulse-badge');
-    if (pulseBadge) {
-        pulseBadge.remove();
-    }
-    
-    if (totalVencido > 0) {
-        cardVencido.classList.add('has-alert');
-        
-        pulseBadge = document.createElement('div');
-        pulseBadge.className = 'pulse-badge';
-        pulseBadge.innerHTML = `
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="12" y1="8" x2="12" y2="12"></line>
-                <line x1="12" y1="16" x2="12.01" y2="16"></line>
-            </svg>
-        `;
-        cardVencido.appendChild(pulseBadge);
-    } else {
-        cardVencido.classList.remove('has-alert');
-    }
+    document.getElementById('statPago').textContent = `R$ ${totalPago.toFixed(2)}`;
+    document.getElementById('statVencido').textContent = `R$ ${totalVencido.toFixed(2)}`;
+    document.getElementById('statReceber').textContent = `R$ ${totalReceber.toFixed(2)}`;
+    document.getElementById('statFaturado').textContent = `R$ ${totalFaturado.toFixed(2)}`;
 }
 
 // ============================================
-// MODAL DE CONTAS VENCIDAS
-// ============================================
-window.showVencidosModal = function() {
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    
-    const contasVencidas = contas.filter(c => {
-        if (c.status === 'PAGO') return false;
-        if (!c.data_vencimento) return false;
-        
-        const venc = new Date(c.data_vencimento);
-        venc.setHours(0, 0, 0, 0);
-        return venc <= hoje;
-    });
-    
-    contasVencidas.sort((a, b) => {
-        const dataA = new Date(a.data_vencimento);
-        const dataB = new Date(b.data_vencimento);
-        return dataA - dataB;
-    });
-    
-    const modalBody = document.getElementById('vencidosModalBody');
-    if (!modalBody) return;
-    
-    if (contasVencidas.length === 0) {
-        modalBody.innerHTML = `
-            <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity: 0.3; margin-bottom: 1rem;">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <path d="M12 8l0 4"></path>
-                    <path d="M12 16l.01 0"></path>
-                </svg>
-                <p style="font-size: 1.1rem; font-weight: 600; margin: 0;">Nenhuma conta vencida</p>
-                <p style="font-size: 0.9rem; margin-top: 0.5rem;">Todas as contas estão em dia</p>
-            </div>
-        `;
-    } else {
-        modalBody.innerHTML = `
-            <div style="overflow-x: auto;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Nº NF</th>
-                            <th>Órgão</th>
-                            <th>Vencimento</th>
-                            <th>Valor</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${contasVencidas.map(c => `
-                            <tr>
-                                <td><strong>${c.numero_nf || '-'}</strong></td>
-                                <td>${c.orgao || '-'}</td>
-                                <td style="white-space: nowrap; color: #EF4444; font-weight: 600;">${formatDate(c.data_vencimento)}</td>
-                                <td><strong>R$ ${parseFloat(c.valor || 0).toFixed(2)}</strong></td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-        `;
-    }
-    
-    const vencidosModal = document.getElementById('vencidosModal');
-    if (vencidosModal) {
-        vencidosModal.style.display = 'flex';
-    }
-};
-
-window.closeVencidosModal = function() {
-    const vencidosModal = document.getElementById('vencidosModal');
-    if (vencidosModal) {
-        vencidosModal.style.display = 'none';
-    }
-};
-
-// ============================================
-// FORMULÁRIO COM OBSERVAÇÕES
-// ============================================
-window.toggleForm = function() {
-    console.log('🆕 Abrindo formulário para nova conta');
-    showFormModal(null);
-};
-
-function showFormModal(editingId = null) {
-    console.log('📝 showFormModal chamada com ID:', editingId);
-    showToast('Formulário em desenvolvimento', 'error');
-    // TODO: Implementar formulário completo
-}
-
-window.showFormModal = showFormModal;
-
-// ============================================
-// FILTROS - ATUALIZAÇÃO DINÂMICA
+// ATUALIZAR FILTROS
 // ============================================
 function updateAllFilters() {
-    updateVendedorFilter();
-    updateBancoFilter();
-}
-
-function updateVendedorFilter() {
-    const vendedores = new Set();
-    contas.forEach(c => {
-        if (c.vendedor?.trim()) {
-            vendedores.add(c.vendedor.trim());
-        }
-    });
-
-    const select = document.getElementById('filterVendedor');
-    if (select) {
-        const currentValue = select.value;
-        select.innerHTML = '<option value="">Todos Vendedores</option>';
-        Array.from(vendedores).sort().forEach(v => {
-            const option = document.createElement('option');
-            option.value = v;
-            option.textContent = v;
-            select.appendChild(option);
-        });
-        select.value = currentValue;
+    const vendedores = [...new Set(contas.map(c => c.vendedor).filter(Boolean))].sort();
+    const bancos = [...new Set(contas.map(c => c.banco).filter(Boolean))].sort();
+    
+    const filterVendedor = document.getElementById('filterVendedor');
+    if (filterVendedor) {
+        const currentValue = filterVendedor.value;
+        filterVendedor.innerHTML = '<option value="">Todos Vendedores</option>' +
+            vendedores.map(v => `<option value="${v}">${v}</option>`).join('');
+        filterVendedor.value = currentValue;
     }
-}
-
-function updateBancoFilter() {
-    const bancos = new Set();
-    contas.forEach(c => {
-        if (c.banco?.trim()) {
-            bancos.add(c.banco.trim());
-        }
-    });
-
-    const select = document.getElementById('filterBanco');
-    if (select) {
-        const currentValue = select.value;
-        select.innerHTML = '<option value="">Todos Bancos</option>';
-        Array.from(bancos).sort().forEach(b => {
-            const option = document.createElement('option');
-            option.value = b;
-            option.textContent = b;
-            select.appendChild(option);
-        });
-        select.value = currentValue;
+    
+    const filterBanco = document.getElementById('filterBanco');
+    if (filterBanco) {
+        const currentValue = filterBanco.value;
+        filterBanco.innerHTML = '<option value="">Todos Bancos</option>' +
+            bancos.map(b => `<option value="${b}">${b}</option>`).join('');
+        filterBanco.value = currentValue;
     }
 }
 
 // ============================================
-// FILTROS E RENDERIZAÇÃO
+// FILTRAR CONTAS
 // ============================================
 function filterContas() {
-    const searchTerm = document.getElementById('search')?.value.toLowerCase() || '';
-    const filterVendedor = document.getElementById('filterVendedor')?.value || '';
-    const filterBanco = document.getElementById('filterBanco')?.value || '';
-    const filterStatus = document.getElementById('filterStatus')?.value || '';
+    const searchTerm = document.getElementById('search').value.toLowerCase();
+    const filterVendedor = document.getElementById('filterVendedor').value;
+    const filterBanco = document.getElementById('filterBanco').value;
+    const filterStatus = document.getElementById('filterStatus').value;
     
-    let filtered = [...contas];
-
-    filtered = filtered.filter(c => {
-        const dataVencimento = new Date(c.data_vencimento);
-        return dataVencimento.getMonth() === currentMonth.getMonth() && dataVencimento.getFullYear() === currentMonth.getFullYear();
-    });
-
-    if (filterVendedor) {
-        filtered = filtered.filter(c => c.vendedor === filterVendedor);
-    }
-
-    if (filterBanco) {
-        filtered = filtered.filter(c => c.banco === filterBanco);
-    }
-
-    if (filterStatus) {
-        filtered = filtered.filter(c => c.status === filterStatus);
-    }
-
-    if (searchTerm) {
-        filtered = filtered.filter(c => {
-            const searchFields = [
-                c.numero_nf,
-                c.orgao,
-                c.vendedor,
-                c.banco
-            ];
-            
-            return searchFields.some(field => 
-                field && field.toString().toLowerCase().includes(searchTerm)
-            );
-        });
-    }
-
-    filtered.sort((a, b) => {
-        const numA = parseInt(a.numero_nf) || 0;
-        const numB = parseInt(b.numero_nf) || 0;
-        return numA - numB;
+    const mesAtual = currentMonth.getMonth();
+    const anoAtual = currentMonth.getFullYear();
+    
+    const filtered = contas.filter(conta => {
+        const dataEmissao = new Date(conta.data_emissao + 'T00:00:00');
+        const mesEmissao = dataEmissao.getMonth();
+        const anoEmissao = dataEmissao.getFullYear();
+        
+        if (mesEmissao !== mesAtual || anoEmissao !== anoAtual) return false;
+        
+        const matchSearch = !searchTerm || 
+            (conta.numero_nf && conta.numero_nf.toLowerCase().includes(searchTerm)) ||
+            (conta.orgao && conta.orgao.toLowerCase().includes(searchTerm)) ||
+            (conta.vendedor && conta.vendedor.toLowerCase().includes(searchTerm));
+        
+        const matchVendedor = !filterVendedor || conta.vendedor === filterVendedor;
+        const matchBanco = !filterBanco || conta.banco === filterBanco;
+        const matchStatus = !filterStatus || conta.status === filterStatus;
+        
+        return matchSearch && matchVendedor && matchBanco && matchStatus;
     });
     
     renderContas(filtered);
 }
 
 // ============================================
-// RENDERIZAÇÃO
+// RENDERIZAR CONTAS
 // ============================================
 function renderContas(contasToRender) {
     const container = document.getElementById('contasContainer');
     
-    if (!container) return;
-    
     if (!contasToRender || contasToRender.length === 0) {
-        container.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);">Nenhuma conta encontrada</div>';
+        container.innerHTML = `
+            <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity: 0.3; margin-bottom: 1rem;">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <p style="font-size: 1.1rem; font-weight: 600; margin: 0;">Nenhuma conta encontrada</p>
+                <p style="font-size: 0.9rem; margin-top: 0.5rem;">Tente ajustar os filtros ou adicionar uma nova conta</p>
+            </div>
+        `;
         return;
     }
-
+    
+    const displayValue = (val) => {
+        if (!val || val === 'NÃO INFORMADO') return '-';
+        return val;
+    };
+    
     const table = `
-        <div style="overflow-x: auto;">
+        <div class="table-wrapper">
             <table>
                 <thead>
                     <tr>
-                        <th style="width: 50px; text-align: center;"></th>
-                        <th>NF</th>
+                        <th style="width: 120px;">Nº NF</th>
+                        <th style="width: 120px;">Data Emissão</th>
                         <th>Órgão</th>
-                        <th>Vendedor</th>
-                        <th>Banco</th>
-                        <th>Emissão</th>
-                        <th>Vencimento</th>
-                        <th>Valor</th>
-                        <th>Status</th>
-                        <th style="text-align: center;">Ações</th>
+                        <th style="width: 140px;">Vendedor</th>
+                        <th style="width: 140px;">Banco</th>
+                        <th style="width: 120px;">Valor</th>
+                        <th style="width: 140px;">Status</th>
+                        <th style="width: 240px; text-align: center;">Ações</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${contasToRender.map(c => {
-                        const displayValue = (val) => {
-                            if (!val || val === 'NÃO INFORMADO') return '-';
-                            return val;
-                        };
-                        
-                        // Determinar se deve mostrar checkbox
-                        const tiposPermitidos = ['ENVIO', 'SIMPLES_REMESSA'];
-                        const tipoNf = c.tipo_nf || 'ENVIO';
-                        const showCheckbox = tiposPermitidos.includes(tipoNf);
-                        const isPago = c.status === 'PAGO';
-                        const rowClass = isPago ? 'row-pago' : '';
-                        
-                        return `
-                        <tr class="${rowClass}" data-id="${c.id}">
-                            <td style="text-align: center; padding: 8px;">
-                                ${showCheckbox ? `
-                                <div class="checkbox-wrapper">
-                                    <input 
-                                        type="checkbox" 
-                                        id="check-${c.id}"
-                                        ${isPago ? 'checked' : ''}
-                                        class="styled-checkbox"
-                                    >
-                                    <label for="check-${c.id}" class="checkbox-label-styled"></label>
-                                </div>
-                                ` : ''}
-                            </td>
+                    ${contasToRender.map(c => `
+                        <tr data-id="${c.id}">
                             <td><strong>${c.numero_nf || '-'}</strong></td>
-                            <td style="max-width: 200px; word-wrap: break-word; white-space: normal;">${c.orgao || '-'}</td>
+                            <td style="white-space: nowrap;">${formatDate(c.data_emissao)}</td>
+                            <td>${displayValue(c.orgao)}</td>
                             <td>${displayValue(c.vendedor)}</td>
                             <td>${displayValue(c.banco)}</td>
-                            <td style="white-space: nowrap;">${formatDate(c.data_emissao)}</td>
-                            <td style="white-space: nowrap;">${formatDate(c.data_vencimento)}</td>
                             <td><strong>R$ ${c.valor ? parseFloat(c.valor).toFixed(2) : '0,00'}</strong></td>
-                            <td>${getStatusBadge(c.status)}</td>
+                            <td>${getStatusBadgeForRender(c)}</td>
                             <td class="actions-cell" style="text-align: center; white-space: nowrap;">
                                 <button class="action-btn view" onclick="handleViewClick('${c.id}')" title="Ver detalhes">Ver</button>
                                 <button class="action-btn edit" onclick="handleEditClick('${c.id}')" title="Editar">Editar</button>
                                 <button class="action-btn delete" onclick="handleDeleteClick('${c.id}')" title="Excluir">Excluir</button>
                             </td>
                         </tr>
-                    `}).join('')}
+                    `).join('')}
                 </tbody>
             </table>
         </div>
@@ -990,32 +497,58 @@ function renderContas(contasToRender) {
 }
 
 // ============================================
-// UTILITÁRIOS
+// BADGES E LABELS
+// ============================================
+function getTipoNfLabel(tipo) {
+    const labels = {
+        'ENVIO': 'Envio',
+        'CANCELADA': 'Cancelada',
+        'REMESSA_AMOSTRA': 'Remessa de Amostra',
+        'SIMPLES_REMESSA': 'Simples Remessa',
+        'DEVOLUCAO': 'Devolução'
+    };
+    return labels[tipo] || tipo || 'Envio';
+}
+
+function getStatusBadgeForRender(conta) {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    
+    if (conta.status === 'PAGO') {
+        return '<span class="badge entregue">PAGO</span>';
+    }
+    
+    if (conta.data_vencimento) {
+        const dataVenc = new Date(conta.data_vencimento + 'T00:00:00');
+        dataVenc.setHours(0, 0, 0, 0);
+        
+        if (dataVenc < hoje) {
+            return '<span class="badge devolvido">VENCIDO</span>';
+        }
+    }
+    
+    return '<span class="badge transito">PENDENTE</span>';
+}
+
+function getStatusBadge(status) {
+    const statusMap = {
+        'PENDENTE': { class: 'transito', text: 'Pendente' },
+        'PAGO': { class: 'entregue', text: 'Pago' },
+        'VENCIDO': { class: 'devolvido', text: 'Vencido' },
+        'A_RECEBER': { class: 'transito', text: 'A Receber' }
+    };
+    
+    const s = statusMap[status] || { class: 'transito', text: status };
+    return `<span class="badge ${s.class}">${s.text}</span>`;
+}
+
+// ============================================
+// UTILIDADES
 // ============================================
 function formatDate(dateString) {
     if (!dateString) return '-';
     const date = new Date(dateString + 'T00:00:00');
     return date.toLocaleDateString('pt-BR');
-}
-
-function getTipoNfLabel(tipo) {
-    const labels = {
-        'ENVIO': 'Envio',
-        'DEVOLUCAO': 'Devolução',
-        'SIMPLES_REMESSA': 'Simples Remessa',
-        'REMESSA_AMOSTRA': 'Remessa de Amostra'
-    };
-    return labels[tipo] || tipo || 'Envio';
-}
-
-function getStatusBadge(status) {
-    const badges = {
-        'PAGO': '<span class="status-badge status-success">PAGO</span>',
-        'PENDENTE': '<span class="status-badge status-warning">PENDENTE</span>',
-        'VENCIDO': '<span class="status-badge status-danger">VENCIDO</span>',
-        'ESPECIAL': '<span class="badge badge-especial">ESPECIAL</span>'
-    };
-    return badges[status] || `<span class="status-badge">${status}</span>`;
 }
 
 function showToast(message, type) {
@@ -1034,5 +567,529 @@ function showToast(message, type) {
     }, 3000);
 }
 
+// ============================================
+// MODAL DE VENCIDOS
+// ============================================
+window.showVencidosModal = function() {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    
+    const vencidos = contas.filter(c => {
+        if (c.status === 'PAGO') return false;
+        if (!c.data_vencimento) return false;
+        
+        const dataVenc = new Date(c.data_vencimento + 'T00:00:00');
+        dataVenc.setHours(0, 0, 0, 0);
+        return dataVenc < hoje;
+    });
+    
+    vencidos.sort((a, b) => {
+        const dataA = new Date(a.data_vencimento);
+        const dataB = new Date(b.data_vencimento);
+        return dataA - dataB;
+    });
+    
+    const modalBody = document.getElementById('vencidosModalBody');
+    if (!modalBody) return;
+    
+    if (vencidos.length === 0) {
+        modalBody.innerHTML = `
+            <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity: 0.3; margin-bottom: 1rem;">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M12 8l0 4"></path>
+                    <path d="M12 16l.01 0"></path>
+                </svg>
+                <p style="font-size: 1.1rem; font-weight: 600; margin: 0;">Nenhuma conta vencida</p>
+                <p style="font-size: 0.9rem; margin-top: 0.5rem;">Todas as contas estão em dia</p>
+            </div>
+        `;
+    } else {
+        modalBody.innerHTML = `
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nº NF</th>
+                            <th>Data Emissão</th>
+                            <th>Órgão</th>
+                            <th>Vencimento</th>
+                            <th>Valor</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${vencidos.map(c => `
+                            <tr>
+                                <td><strong>${c.numero_nf || '-'}</strong></td>
+                                <td style="white-space: nowrap;">${formatDate(c.data_emissao)}</td>
+                                <td>${c.orgao || '-'}</td>
+                                <td style="white-space: nowrap; color: #EF4444; font-weight: 600;">${formatDate(c.data_vencimento)}</td>
+                                <td><strong>R$ ${c.valor ? parseFloat(c.valor).toFixed(2) : '0,00'}</strong></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+    
+    const modal = document.getElementById('vencidosModal');
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+};
+
+window.closeVencidosModal = function() {
+    const modal = document.getElementById('vencidosModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+};
+
+// ============================================
+// FORMULÁRIO COMPLETO
+// ============================================
+window.toggleForm = function() {
+    console.log('🆕 Abrindo formulário para nova conta');
+    showFormModal(null);
+};
+
+window.showFormModal = function(editingId = null) {
+    console.log('📝 showFormModal chamada com ID:', editingId);
+    
+    const isEditing = editingId !== null;
+    let conta = null;
+    
+    if (isEditing) {
+        const idStr = String(editingId);
+        conta = contas.find(c => String(c.id) === idStr);
+        
+        if (!conta) {
+            showToast('Conta não encontrada!', 'error');
+            return;
+        }
+        console.log('✏️ Editando conta:', conta);
+    } else {
+        console.log('🆕 Criando nova conta');
+    }
+
+    let observacoesArray = [];
+    if (conta && conta.observacoes) {
+        try {
+            observacoesArray = typeof conta.observacoes === 'string' 
+                ? JSON.parse(conta.observacoes) 
+                : conta.observacoes;
+        } catch (e) {
+            console.error('Erro ao parsear observações:', e);
+        }
+    }
+
+    const observacoesHTML = observacoesArray.length > 0 
+        ? observacoesArray.map((obs, idx) => `
+            <div class="observacao-item" data-index="${idx}">
+                <div class="observacao-header">
+                    <span class="observacao-data">${new Date(obs.timestamp).toLocaleString('pt-BR')}</span>
+                    <button type="button" class="btn-remove-obs" onclick="removerObservacao(${idx})" title="Remover">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <p class="observacao-texto">${obs.texto}</p>
+            </div>
+        `).join('')
+        : '<p style="color: var(--text-secondary); font-style: italic; text-align: center; padding: 2rem;">Nenhuma observação registrada</p>';
+
+    const modalHTML = `
+        <div class="modal-overlay" id="formModal" style="display: flex;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">${isEditing ? 'Editar Conta' : 'Nova Conta'}</h3>
+                    <button class="close-modal" onclick="closeFormModal(true)">✕</button>
+                </div>
+                
+                <div class="tabs-container">
+                    <div class="tabs-nav">
+                        <button class="tab-btn active" onclick="switchFormTab(0)">Dados da Conta</button>
+                        <button class="tab-btn" onclick="switchFormTab(1)">Pagamento</button>
+                        <button class="tab-btn" onclick="switchFormTab(2)">Observações</button>
+                    </div>
+
+                    <form id="contaForm" onsubmit="handleSubmit(event)">
+                        <input type="hidden" id="editId" value="${editingId || ''}">
+                        <input type="hidden" id="observacoesData" value='${JSON.stringify(observacoesArray)}'>
+                        
+                        <div class="tab-content active" id="tab-dados">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="numero_nf">Número da NF *</label>
+                                    <input type="text" id="numero_nf" value="${conta?.numero_nf || ''}" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="orgao">Órgão *</label>
+                                    <input type="text" id="orgao" value="${conta?.orgao || ''}" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="vendedor">Vendedor</label>
+                                    <select id="vendedor">
+                                        <option value="">Selecione...</option>
+                                        <option value="ROBERTO" ${conta?.vendedor === 'ROBERTO' ? 'selected' : ''}>ROBERTO</option>
+                                        <option value="ISAQUE" ${conta?.vendedor === 'ISAQUE' ? 'selected' : ''}>ISAQUE</option>
+                                        <option value="MIGUEL" ${conta?.vendedor === 'MIGUEL' ? 'selected' : ''}>MIGUEL</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="banco">Banco</label>
+                                    <select id="banco">
+                                        <option value="">Selecione...</option>
+                                        <option value="ITAÚ" ${conta?.banco === 'ITAÚ' ? 'selected' : ''}>ITAÚ</option>
+                                        <option value="BRADESCO" ${conta?.banco === 'BRADESCO' ? 'selected' : ''}>BRADESCO</option>
+                                        <option value="CAIXA" ${conta?.banco === 'CAIXA' ? 'selected' : ''}>CAIXA</option>
+                                        <option value="BANCO DO BRASIL" ${conta?.banco === 'BANCO DO BRASIL' ? 'selected' : ''}>BANCO DO BRASIL</option>
+                                        <option value="SANTANDER" ${conta?.banco === 'SANTANDER' ? 'selected' : ''}>SANTANDER</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="valor">Valor (R$) *</label>
+                                    <input type="number" id="valor" step="0.01" min="0" value="${conta?.valor || ''}" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="data_emissao">Data de Emissão *</label>
+                                    <input type="date" id="data_emissao" value="${conta?.data_emissao || ''}" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="tipo_nf">Tipo de NF</label>
+                                    <select id="tipo_nf">
+                                        <option value="ENVIO" ${!conta?.tipo_nf || conta?.tipo_nf === 'ENVIO' ? 'selected' : ''}>Envio</option>
+                                        <option value="CANCELADA" ${conta?.tipo_nf === 'CANCELADA' ? 'selected' : ''}>Cancelada</option>
+                                        <option value="REMESSA_AMOSTRA" ${conta?.tipo_nf === 'REMESSA_AMOSTRA' ? 'selected' : ''}>Remessa de Amostra</option>
+                                        <option value="SIMPLES_REMESSA" ${conta?.tipo_nf === 'SIMPLES_REMESSA' ? 'selected' : ''}>Simples Remessa</option>
+                                        <option value="DEVOLUCAO" ${conta?.tipo_nf === 'DEVOLUCAO' ? 'selected' : ''}>Devolução</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="tab-content" id="tab-pagamento">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="data_vencimento">Data de Vencimento</label>
+                                    <input type="date" id="data_vencimento" value="${conta?.data_vencimento || ''}">
+                                </div>
+                                <div class="form-group">
+                                    <label for="data_pagamento">Data de Pagamento</label>
+                                    <input type="date" id="data_pagamento" value="${conta?.data_pagamento || ''}">
+                                </div>
+                                <div class="form-group">
+                                    <label for="status">Status</label>
+                                    <select id="status">
+                                        <option value="A_RECEBER" ${!conta?.status || conta?.status === 'A_RECEBER' ? 'selected' : ''}>A Receber</option>
+                                        <option value="PAGO" ${conta?.status === 'PAGO' ? 'selected' : ''}>Pago</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="tab-content" id="tab-observacoes">
+                            <div class="observacoes-section">
+                                <div class="observacoes-list" id="observacoesList">
+                                    ${observacoesHTML}
+                                </div>
+                                
+                                <div class="nova-observacao">
+                                    <label for="novaObservacao">Nova Observação</label>
+                                    <textarea id="novaObservacao" placeholder="Digite sua observação aqui..." rows="3"></textarea>
+                                    <button type="button" class="btn-add-obs" onclick="adicionarObservacao()">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                                        </svg>
+                                        Adicionar Observação
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="modal-actions">
+                            <button type="submit" class="save">${editingId ? 'Atualizar' : 'Salvar'}</button>
+                            <button type="button" class="secondary" onclick="closeFormModal(true)">Cancelar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const existingModal = document.getElementById('formModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    const camposMaiusculas = ['numero_nf', 'orgao'];
+
+    camposMaiusculas.forEach(campoId => {
+        const campo = document.getElementById(campoId);
+        if (campo) {
+            campo.addEventListener('input', (e) => {
+                const start = e.target.selectionStart;
+                e.target.value = e.target.value.toUpperCase();
+                e.target.setSelectionRange(start, start);
+            });
+        }
+    });
+    
+    setTimeout(() => document.getElementById('numero_nf')?.focus(), 100);
+    
+    console.log('✅ Modal de formulário criado e exibido');
+};
+
+// ============================================
+// FUNÇÕES DE OBSERVAÇÕES
+// ============================================
+window.adicionarObservacao = function() {
+    const textarea = document.getElementById('novaObservacao');
+    const texto = textarea.value.trim();
+    
+    if (!texto) {
+        showToast('Digite uma observação primeiro', 'error');
+        return;
+    }
+    
+    const observacoesDataField = document.getElementById('observacoesData');
+    let observacoes = JSON.parse(observacoesDataField.value || '[]');
+    
+    observacoes.push({
+        texto: texto,
+        timestamp: new Date().toISOString()
+    });
+    
+    observacoesDataField.value = JSON.stringify(observacoes);
+    textarea.value = '';
+    
+    renderObservacoesList(observacoes);
+    showToast('Observação adicionada', 'success');
+};
+
+window.removerObservacao = function(index) {
+    const observacoesDataField = document.getElementById('observacoesData');
+    let observacoes = JSON.parse(observacoesDataField.value || '[]');
+    
+    observacoes.splice(index, 1);
+    observacoesDataField.value = JSON.stringify(observacoes);
+    
+    renderObservacoesList(observacoes);
+    showToast('Observação removida', 'info');
+};
+
+function renderObservacoesList(observacoes) {
+    const container = document.getElementById('observacoesList');
+    if (!container) return;
+    
+    if (observacoes.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-secondary); font-style: italic; text-align: center; padding: 2rem;">Nenhuma observação registrada</p>';
+        return;
+    }
+    
+    container.innerHTML = observacoes.map((obs, idx) => `
+        <div class="observacao-item" data-index="${idx}">
+            <div class="observacao-header">
+                <span class="observacao-data">${new Date(obs.timestamp).toLocaleString('pt-BR')}</span>
+                <button type="button" class="btn-remove-obs" onclick="removerObservacao(${idx})" title="Remover">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <p class="observacao-texto">${obs.texto}</p>
+        </div>
+    `).join('');
+}
+
+// ============================================
+// NAVEGAÇÃO DE ABAS
+// ============================================
+window.switchFormTab = function(tabIndex) {
+    const allTabs = document.querySelectorAll('.tab-content');
+    const allBtns = document.querySelectorAll('.tab-btn');
+    
+    allTabs.forEach(tab => tab.classList.remove('active'));
+    allBtns.forEach(btn => btn.classList.remove('active'));
+    
+    allTabs[tabIndex].classList.add('active');
+    allBtns[tabIndex].classList.add('active');
+};
+
+// ============================================
+// FECHAR MODAL
+// ============================================
+window.closeFormModal = function(askConfirm = false) {
+    const modal = document.getElementById('formModal');
+    if (!modal) return;
+    
+    if (askConfirm) {
+        const hasData = document.getElementById('numero_nf')?.value.trim() || 
+                       document.getElementById('orgao')?.value.trim();
+        
+        if (hasData) {
+            const confirm = window.confirm('Tem certeza? Os dados não salvos serão perdidos.');
+            if (!confirm) return;
+        }
+    }
+    
+    modal.remove();
+};
+
+// ============================================
+// SUBMIT DO FORMULÁRIO
+// ============================================
+window.handleSubmit = async function(event) {
+    event.preventDefault();
+    
+    const editId = document.getElementById('editId').value;
+    const isEditing = editId !== '';
+    
+    const formData = {
+        numero_nf: document.getElementById('numero_nf').value.trim(),
+        orgao: document.getElementById('orgao').value.trim(),
+        vendedor: document.getElementById('vendedor').value,
+        banco: document.getElementById('banco').value,
+        valor: parseFloat(document.getElementById('valor').value) || 0,
+        data_emissao: document.getElementById('data_emissao').value,
+        data_vencimento: document.getElementById('data_vencimento').value || null,
+        data_pagamento: document.getElementById('data_pagamento').value || null,
+        status: document.getElementById('status').value,
+        tipo_nf: document.getElementById('tipo_nf').value,
+        observacoes: document.getElementById('observacoesData').value
+    };
+    
+    try {
+        const url = isEditing ? `${API_URL}/contas/${editId}` : `${API_URL}/contas`;
+        const method = isEditing ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Session-Token': sessionToken,
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(formData),
+            mode: 'cors'
+        });
+        
+        if (!response.ok) throw new Error('Erro ao salvar');
+        
+        const savedData = await response.json();
+        
+        if (isEditing) {
+            const index = contas.findIndex(c => String(c.id) === editId);
+            if (index !== -1) {
+                contas[index] = savedData;
+            }
+            showToast(`NF ${savedData.numero_nf} Atualizado`, 'success');
+        } else {
+            contas.push(savedData);
+            showToast(`NF ${savedData.numero_nf} Criado`, 'success');
+        }
+        
+        updateAllFilters();
+        updateDashboard();
+        filterContas();
+        closeFormModal(false);
+        
+    } catch (error) {
+        console.error('Erro ao salvar:', error);
+        showToast('Erro ao salvar conta', 'error');
+    }
+};
+
+// ============================================
+// NAVEGAÇÃO DE MÊS
+// ============================================
+function updateMonthDisplay() {
+    const monthDisplay = document.getElementById('currentMonth');
+    if (monthDisplay) {
+        monthDisplay.textContent = `${meses[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`;
+    }
+}
+
+window.changeMonth = function(direction) {
+    currentMonth.setMonth(currentMonth.getMonth() + direction);
+    updateMonthDisplay();
+    filterContas();
+};
+
+// ============================================
+// CALENDÁRIO
+// ============================================
+function initCalendar() {
+    const calendarYear = document.getElementById('calendarYear');
+    if (calendarYear) {
+        calendarYear.textContent = currentMonth.getFullYear();
+    }
+    
+    renderCalendarMonths();
+}
+
+function renderCalendarMonths() {
+    const container = document.getElementById('calendarMonths');
+    if (!container) return;
+    
+    const year = currentMonth.getFullYear();
+    
+    container.innerHTML = meses.map((mes, index) => `
+        <button class="calendar-month-btn ${index === currentMonth.getMonth() ? 'active' : ''}" 
+                onclick="selectMonth(${index})">
+            ${mes}
+        </button>
+    `).join('');
+}
+
+window.selectMonth = function(monthIndex) {
+    currentMonth.setMonth(monthIndex);
+    updateMonthDisplay();
+    renderCalendarMonths();
+    toggleCalendar();
+    filterContas();
+};
+
+window.toggleCalendar = function() {
+    const modal = document.getElementById('calendarModal');
+    if (modal) {
+        modal.style.display = modal.style.display === 'flex' ? 'none' : 'flex';
+    }
+};
+
+window.changeCalendarYear = function(direction) {
+    currentMonth.setFullYear(currentMonth.getFullYear() + direction);
+    document.getElementById('calendarYear').textContent = currentMonth.getFullYear();
+    renderCalendarMonths();
+};
+
+// Fechar modais ao clicar fora
+document.addEventListener('click', function(e) {
+    const calendarModal = document.getElementById('calendarModal');
+    const vencidosModal = document.getElementById('vencidosModal');
+    
+    if (e.target === calendarModal) {
+        calendarModal.style.display = 'none';
+    }
+    if (e.target === vencidosModal) {
+        vencidosModal.style.display = 'none';
+    }
+});
+
+// ============================================
+// LOG FINAL
+// ============================================
 console.log('✅ Script completo carregado com sucesso!');
-console.log('📅 Calendar integrado no script principal');
+console.log('🔧 Funções exportadas para window:', {
+    toggleForm: typeof window.toggleForm,
+    showFormModal: typeof window.showFormModal,
+    handleEditClick: typeof window.handleEditClick,
+    handleSubmit: typeof window.handleSubmit
+});
