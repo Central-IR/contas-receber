@@ -36,7 +36,7 @@ função formatoMoeda(valor) {
 // NAVEGAÇÃO POR MESES
 // ============================================
 function updateMonthDisplay() {
-    const display = document.getElementById('currentMonthDisplay');
+    const display = document.getElementById('currentMonth');
     if (display) {
         display.textContent = `${meses[currentMonth]} ${currentYear}`;
     }
@@ -44,18 +44,12 @@ function updateMonthDisplay() {
     filterContas();
 }
 
-window.previousMonth = function() {
-    currentMonth--;
+window.changeMonth = function(direction) {
+    currentMonth = currentMonth + direction;
     if (currentMonth < 0) {
         currentMonth = 11;
         currentYear--;
-    }
-    updateMonthDisplay();
-};
-
-window.nextMonth = function() {
-    currentMonth++;
-    if (currentMonth > 11) {
+    } else if (currentMonth > 11) {
         currentMonth = 0;
         currentYear++;
     }
@@ -244,6 +238,33 @@ function mapearConta(conta) {
     };
 }
 
+// ============================================
+// SINCRONIZAÇÃO DE DADOS
+// ============================================
+window.sincronizarDados = async function() {
+    console.log('🔄 Sincronizando dados...');
+    
+    const syncButtons = document.querySelectorAll('button[onclick="sincronizarDados()"]');
+    syncButtons.forEach(btn => {
+        const svg = btn.querySelector('svg');
+        if (svg) {
+            svg.style.animation = 'spin 1s linear infinite';
+        }
+    });
+    
+    showMessage('Dados sincronizados', 'success');
+    await loadContas();
+    
+    setTimeout(() => {
+        syncButtons.forEach(btn => {
+            const svg = btn.querySelector('svg');
+            if (svg) {
+                svg.style.animation = '';
+            }
+        });
+    }, 1000);
+};
+
 function startPolling() {
     setInterval(() => {
         if (isOnline) loadContas();
@@ -302,9 +323,13 @@ function updateDashboard() {
         })
         .reduce((sum, c) => sum + c.valor, 0);
 
+    // Calcula A Receber como: Faturado - Pago
+    const totalReceber = totalFaturado - totalPago;
+
     document.getElementById('statFaturado').textContent = formatCurrency(totalFaturado);
     document.getElementById('statPago').textContent = formatCurrency(totalPago);
     document.getElementById('statVencido').textContent = formatCurrency(totalVencido);
+    document.getElementById('statReceber').textContent = formatCurrency(totalReceber);
 
     const badgeVencido = document.getElementById('pulseBadgeVencido');
     const cardVencido = document.getElementById('cardVencido');
@@ -418,6 +443,7 @@ function showFormModal(editingId = null) {
             <div class="modal-content">
                 <div class="modal-header">
                     <h3 class="modal-title">${isEditing ? 'Editar Conta' : 'Nova Conta a Receber'}</h3>
+                    <button class="close-modal" onclick="closeFormModal()">✕</button>
                 </div>
                 
                 <div class="tabs-container">
@@ -717,6 +743,7 @@ window.viewConta = function(id) {
             <div class="modal-content">
                 <div class="modal-header">
                     <h3 class="modal-title">Detalhes da Conta</h3>
+                    <button class="close-modal" onclick="closeViewModal()">✕</button>
                 </div>
                 
                 <div class="tabs-container">
