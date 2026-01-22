@@ -327,47 +327,47 @@ function updateDashboard() {
         return data.getMonth() === currentMonth && data.getFullYear() === currentYear;
     });
 
-    const contasEnvio = contasMesAtual.filter(c => !c.tipo_nf || c.tipo_nf === 'ENVIO');
-
-    const totalFaturado = contasEnvio.reduce((sum, c) => sum + c.valor, 0);
-    const totalPago = contasEnvio.filter(c => c.status === 'PAGO').reduce((sum, c) => sum + c.valor, 0);
-
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-
     // VENCIDO: conta TODAS as contas vencidas (independente do mês) que não foram pagas
-    const todasContasEnvio = contas.filter(c => !c.tipo_nf || c.tipo_nf === 'ENVIO');
-    const totalVencido = todasContasEnvio
-        .filter(c => {
-            if (c.status === 'PAGO') return false;
-            const dataVencimento = new Date(c.data_vencimento + 'T00:00:00');
-            return dataVencimento < hoje;
-        })
-        .reduce((sum, c) => sum + c.valor, 0);
+const todasContasEnvio = contas.filter(c => !c.tipo_nf || c.tipo_nf === 'ENVIO');
 
-    const totalReceber = totalFaturado - totalPago;
+// Calcula a QUANTIDADE de contas vencidas
+const quantidadeVencidas = todasContasEnvio.filter(c => {
+    if (c.status === 'PAGO') return false;
+    const dataVencimento = new Date(c.data_vencimento + 'T00:00:00');
+    return dataVencimento < hoje;
+}).length;
 
-    const statFaturado = document.getElementById('statFaturado');
-    const statPago = document.getElementById('statPago');
-    const statVencido = document.getElementById('statVencido');
-    const statReceber = document.getElementById('statReceber');
+// Calcula o VALOR total vencido (para usar no badge/alerta)
+const totalVencido = todasContasEnvio
+    .filter(c => {
+        if (c.status === 'PAGO') return false;
+        const dataVencimento = new Date(c.data_vencimento + 'T00:00:00');
+        return dataVencimento < hoje;
+    })
+    .reduce((sum, c) => sum + c.valor, 0);
 
-    if (statFaturado) statFaturado.textContent = formatCurrency(totalFaturado);
-    if (statPago) statPago.textContent = formatCurrency(totalPago);
-    if (statVencido) statVencido.textContent = formatCurrency(totalVencido);
-    if (statReceber) statReceber.textContent = formatCurrency(totalReceber);
+const totalReceber = totalFaturado - totalPago;
 
-    const badgeVencido = document.getElementById('pulseBadgeVencido');
-    const cardVencido = document.getElementById('cardVencido');
+const statFaturado = document.getElementById('statFaturado');
+const statPago = document.getElementById('statPago');
+const statVencido = document.getElementById('statVencido');
+const statReceber = document.getElementById('statReceber');
 
-    if (badgeVencido && cardVencido) {
-        if (totalVencido > 0) {
-            badgeVencido.style.display = 'flex';
-            cardVencido.classList.add('has-alert');
-        } else {
-            badgeVencido.style.display = 'none';
-            cardVencido.classList.remove('has-alert');
-        }
+if (statFaturado) statFaturado.textContent = formatCurrency(totalFaturado);
+if (statPago) statPago.textContent = formatCurrency(totalPago);
+if (statVencido) statVencido.textContent = quantidadeVencidas; // ← MUDANÇA AQUI
+if (statReceber) statReceber.textContent = formatCurrency(totalReceber);
+
+const badgeVencido = document.getElementById('pulseBadgeVencido');
+const cardVencido = document.getElementById('cardVencido');
+
+if (badgeVencido && cardVencido) {
+    if (quantidadeVencidas > 0) { // ← Usar quantidade ao invés de valor
+        badgeVencido.style.display = 'flex';
+        cardVencido.classList.add('has-alert');
+    } else {
+        badgeVencido.style.display = 'none';
+        cardVencido.classList.remove('has-alert');
     }
 }
 
