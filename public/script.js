@@ -381,6 +381,7 @@ if (badgeVencido && cardVencido) {
         cardVencido.classList.remove('has-alert');
     }
 }
+}
 
 function verificarContasVencidas() {
     const jaExibiu = sessionStorage.getItem(NOTIFICATION_KEY);
