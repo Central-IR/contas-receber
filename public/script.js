@@ -19,9 +19,12 @@ const meses = [
 
 console.log('🚀 Contas a Receber iniciada');
 
-document.addEventListener('DOMContentLoaded', () => {
+// Esperar o DOM estar pronto antes de inicializar
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', verificarAutenticacao);
+} else {
     verificarAutenticacao();
-});
+}
 
 // ============================================
 // FORMATAÇÃO DE MOEDA
@@ -327,20 +330,27 @@ function updateDashboard() {
     // Calcula A Receber como: Faturado - Pago
     const totalReceber = totalFaturado - totalPago;
 
-    document.getElementById('statFaturado').textContent = formatCurrency(totalFaturado);
-    document.getElementById('statPago').textContent = formatCurrency(totalPago);
-    document.getElementById('statVencido').textContent = formatCurrency(totalVencido);
-    document.getElementById('statReceber').textContent = formatCurrency(totalReceber);
+    const statFaturado = document.getElementById('statFaturado');
+    const statPago = document.getElementById('statPago');
+    const statVencido = document.getElementById('statVencido');
+    const statReceber = document.getElementById('statReceber');
+
+    if (statFaturado) statFaturado.textContent = formatCurrency(totalFaturado);
+    if (statPago) statPago.textContent = formatCurrency(totalPago);
+    if (statVencido) statVencido.textContent = formatCurrency(totalVencido);
+    if (statReceber) statReceber.textContent = formatCurrency(totalReceber);
 
     const badgeVencido = document.getElementById('pulseBadgeVencido');
     const cardVencido = document.getElementById('cardVencido');
 
-    if (totalVencido > 0) {
-        badgeVencido.style.display = 'flex';
-        cardVencido.classList.add('has-alert');
-    } else {
-        badgeVencido.style.display = 'none';
-        cardVencido.classList.remove('has-alert');
+    if (badgeVencido && cardVencido) {
+        if (totalVencido > 0) {
+            badgeVencido.style.display = 'flex';
+            cardVencido.classList.add('has-alert');
+        } else {
+            badgeVencido.style.display = 'none';
+            cardVencido.classList.remove('has-alert');
+        }
     }
 }
 
@@ -416,6 +426,65 @@ window.fecharNotificacaoVencidos = function() {
     if (modal) {
         modal.style.animation = 'fadeOut 0.2s ease forwards';
         setTimeout(() => modal.remove(), 200);
+    }
+};
+
+// ============================================
+// MODAL DE CONTAS VENCIDAS
+// ============================================
+window.showVencidosModal = function() {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+    const contasVencidas = contas.filter(c => {
+        if (c.tipo_nf && c.tipo_nf !== 'ENVIO') return false;
+        if (c.status === 'PAGO') return false;
+        const vencimento = new Date(c.data_vencimento + 'T00:00:00');
+        return vencimento < hoje;
+    });
+
+    if (contasVencidas.length === 0) {
+        showMessage('Não há contas vencidas no momento!', 'success');
+        return;
+    }
+
+    const totalVencido = contasVencidas.reduce((sum, c) => sum + c.valor, 0);
+
+    const listaHTML = contasVencidas.map(c => `
+        <div style="background: #FEE; border-left: 4px solid #EF4444; padding: 1rem; margin-bottom: 0.75rem; border-radius: 4px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                <strong style="color: #1A1A1A;">NF: ${c.numero_nf}</strong>
+                <strong style="color: #EF4444;">${formatCurrency(c.valor)}</strong>
+            </div>
+            <p style="margin: 0; color: #6B7280; font-size: 0.9rem;">Órgão: ${c.orgao}</p>
+            <p style="margin: 0; color: #6B7280; font-size: 0.9rem;">Vencimento: ${formatDate(c.data_vencimento)}</p>
+        </div>
+    `).join('');
+
+    const bodyHTML = `
+        <h3 style="color: #EF4444; margin: 0 0 1rem 0;">Contas Vencidas (${contasVencidas.length})</h3>
+        <div style="background: #FEF3C7; border-left: 4px solid #F59E0B; padding: 1rem; margin-bottom: 1.5rem; border-radius: 4px;">
+            <p style="margin: 0; color: #92400E; font-weight: 600;">Total Vencido:</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 1.75rem; font-weight: bold; color: #EF4444;">${formatCurrency(totalVencido)}</p>
+        </div>
+        <div style="max-height: 400px; overflow-y: auto;">
+            ${listaHTML}
+        </div>
+    `;
+
+    const modalBody = document.getElementById('vencidosModalBody');
+    const modal = document.getElementById('vencidosModal');
+    
+    if (modalBody && modal) {
+        modalBody.innerHTML = bodyHTML;
+        modal.style.display = 'flex';
+    }
+};
+
+window.closeVencidosModal = function() {
+    const modal = document.getElementById('vencidosModal');
+    if (modal) {
+        modal.style.display = 'none';
     }
 };
 
@@ -831,7 +900,7 @@ function updateVendedoresFilter() {
     const select = document.getElementById('filterVendedor');
     if (select) {
         const currentValue = select.value;
-        select.innerHTML = '<option value="">Todos</option>';
+        select.innerHTML = '<option value="">Todos Vendedores</option>';
         Array.from(vendedores).sort().forEach(v => {
             const option = document.createElement('option');
             option.value = v;
@@ -853,7 +922,7 @@ function updateBancosFilter() {
     const select = document.getElementById('filterBanco');
     if (select) {
         const currentValue = select.value;
-        select.innerHTML = '<option value="">Todos</option>';
+        select.innerHTML = '<option value="">Todos Bancos</option>';
         Array.from(bancos).sort().forEach(b => {
             const option = document.createElement('option');
             option.value = b;
