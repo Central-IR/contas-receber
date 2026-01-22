@@ -509,7 +509,7 @@ function showFormModal(editingId = null) {
     }
 
     const modalHTML = `
-        <div class="modal-overlay" id="formModal">
+        <div class="modal-overlay" id="formModal" style="display: flex;">
             <div class="modal-content">
                 <div class="modal-header">
                     <h3 class="modal-title">${isEditing ? 'Editar Conta' : 'Nova Conta a Receber'}</h3>
@@ -651,7 +651,7 @@ window.switchFormTab = function(index) {
 // ============================================
 // SUBMIT
 // ============================================
-async function handleSubmit(event) {
+window.handleSubmit = async function(event) {
     if (event) event.preventDefault();
 
     const formData = {
@@ -726,7 +726,7 @@ async function handleSubmit(event) {
         console.error('Erro:', error);
         showMessage(`Erro: ${error.message}`, 'error');
     }
-}
+};
 
 // ============================================
 // EDIÇÃO
@@ -809,7 +809,7 @@ window.viewConta = function(id) {
     };
 
     const modalHTML = `
-        <div class="modal-overlay" id="viewModal">
+        <div class="modal-overlay" id="viewModal" style="display: flex;">
             <div class="modal-content">
                 <div class="modal-header">
                     <h3 class="modal-title">Detalhes da Conta</h3>
@@ -1017,8 +1017,9 @@ function renderContas(contasToRender) {
                         const isEspecial = c.tipo_nf && c.tipo_nf !== 'ENVIO';
                         const isEnvio = !c.tipo_nf || c.tipo_nf === 'ENVIO';
                         const isPago = c.status === 'PAGO';
+                        const rowClass = isPago ? 'row-pago' : '';
                         return `
-                        <tr>
+                        <tr class="${rowClass}">
                             <td style="text-align: center;">
                                 ${isEnvio ? `
                                     <button class="check-btn ${isPago ? 'checked' : ''}" 
@@ -1094,6 +1095,10 @@ window.togglePago = async function(id) {
             const savedData = await response.json();
             const index = contas.findIndex(c => c.id === id);
             if (index !== -1) contas[index] = mapearConta(savedData);
+            
+            // Atualiza a renderização após salvar no servidor
+            updateDashboard();
+            filterContas();
         } catch (error) {
             conta.status = statusAnterior;
             conta.data_pagamento = dataPagamentoAnterior;
