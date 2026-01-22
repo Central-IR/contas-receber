@@ -695,12 +695,13 @@ tbody tr:hover {
     background: var(--table-hover);
 }
 
-tbody tr.row-entregue {
+/* LINHA VERDE PARA CONTAS PAGAS */
+tbody tr.row-pago {
     background: rgba(34, 197, 94, 0.12) !important;
-    border-left: 3px solid #22C55E;
+    border-left: 4px solid #22C55E;
 }
 
-tbody tr.row-entregue:hover {
+tbody tr.row-pago:hover {
     background: rgba(34, 197, 94, 0.18) !important;
 }
 
