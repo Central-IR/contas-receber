@@ -118,7 +118,7 @@
                         <div class="filter-dropdown-inline">
                             <select id="filterStatus" onchange="filterContas()">
                                 <option value="">Todos os Status</option>
-                                <option value="PENDENTE">Pendente</option>
+                                <option value="A RECEBER">A Receber</option>
                                 <option value="PAGO">Pago</option>
                                 <option value="VENCIDO">Vencido</option>
                             </select>
@@ -203,16 +203,15 @@
             <div class="modal-body" id="vencidosModalBody"></div>
 
             <div class="modal-actions-alert">
-                <button type="button" onclick="closeVencidosModal()" class="btn-close-red">Fechar</button>
+                <button type="button" onclick="closeVencidosModal()" class="btn-close">Fechar</button>
             </div>
         </div>
     </div>
 
-    <!-- Scripts carregados APÓS o HTML -->
+    <!-- Scripts -->
     <script src="calendar.js"></script>
     <script src="script.js"></script>
     <script>
-        // Garantir que o splash screen seja removido após carregar
         window.addEventListener('load', function() {
             setTimeout(() => {
                 const splash = document.getElementById('splashScreen');
