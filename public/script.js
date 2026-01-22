@@ -1,4 +1,5 @@
-CONFIGURAÇÃO
+// ============================================
+// CONFIGURAÇÃO
 // ============================================
 const PORTAL_URL = 'https://ir-comercio-portal-zcan.onrender.com';
 const API_URL = 'https://contas-receber-m1xw.onrender.com/api';
@@ -8,7 +9,7 @@ let contas = [];
 let isOnline = false;
 let lastDataHash = '';
 let sessionToken = null;
-seja mês atual = nova Data().getMonth();
+let currentMonth = new Date().getMonth();
 let currentYear = new Date().getFullYear();
 
 const meses = [
@@ -25,9 +26,9 @@ document.addEventListener('DOMContentLoaded', () => {
 // ============================================
 // FORMATAÇÃO DE MOEDA
 // ============================================
-função formatoMoeda(valor) {
-    devolva 'R$' + valor.toLocaleString('pt-BR', { 
-        mínimoFractionDigits: 2, 
+function formatCurrency(valor) {
+    return 'R$ ' + valor.toLocaleString('pt-BR', { 
+        minimumFractionDigits: 2, 
         maximumFractionDigits: 2 
     });
 }
@@ -874,13 +875,11 @@ function filterContas() {
 
     let filtered = [...contas];
 
+    // Filtrar por mês/ano
     filtered = filtered.filter(c => {
-        const data = new Date(c.data_vencimento + 'T00:00:00');
+        const data = new Date(c.data_emissao + 'T00:00:00');
         return data.getMonth() === currentMonth && data.getFullYear() === currentYear;
     });
-    const data = new Date(c.data_emissao + 'T00:00:00');
-    return data.getMonth() === currentMonth && data.getFullYear() === currentYear;
-});
 
     if (filterVendedor) {
         filtered = filtered.filter(c => c.vendedor === filterVendedor);
@@ -903,13 +902,13 @@ function filterContas() {
         );
     }
 
-    filtered.sort((a, b) => new Date(b.data_vencimento) - new Date(a.data_vencimento));
     // Ordena por número da NF em ordem DECRESCENTE (maior primeiro)
-filtered.sort((a, b) => {
-    const numA = parseInt(a.numero_nf.replace(/\D/g, '')) || 0;
-    const numB = parseInt(b.numero_nf.replace(/\D/g, '')) || 0;
-    return numB - numA;
-});
+    filtered.sort((a, b) => {
+        const numA = parseInt(a.numero_nf.replace(/\D/g, '')) || 0;
+        const numB = parseInt(b.numero_nf.replace(/\D/g, '')) || 0;
+        return numB - numA;
+    });
+    
     renderContas(filtered);
 }
 
@@ -1039,7 +1038,7 @@ window.togglePago = async function(id) {
 // ============================================
 // UTILIDADES
 // ============================================
-function formatDate(dateString)) {
+function formatDate(dateString) {
     if (!dateString) return '-';
     const date = new Date(dateString + 'T00:00:00');
     return date.toLocaleDateString('pt-BR');
@@ -1051,7 +1050,7 @@ function showMessage(message, type) {
 
     const messageDiv = document.createElement('div');
     messageDiv.className = `floating-message ${type}`;
-    messageDiv.textoConteúdo = mensagem;
+    messageDiv.textContent = message;
 
     document.body.appendChild(messageDiv);
 
@@ -1059,3 +1058,4 @@ function showMessage(message, type) {
         messageDiv.style.animation = 'slideOut 0.3s ease forwards';
         setTimeout(() => messageDiv.remove(), 300);
     }, 3000);
+}
