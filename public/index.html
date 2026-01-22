@@ -58,6 +58,7 @@
                     <div class="stat-content">
                         <div class="stat-value stat-value-danger" id="statVencido">R$ 0,00</div>
                         <div class="stat-label">Vencido</div>
+                        <div class="pulse-badge" id="pulseBadgeVencido" style="display: none;">!</div>
                     </div>
                 </div>
 
@@ -207,13 +208,17 @@
         </div>
     </div>
 
-    <script>
-        setTimeout(() => {
-            const splash = document.getElementById('splashScreen');
-            if (splash) splash.style.display = 'none';
-        }, 3000);
-    </script>
-    <script src="script.js"></script>
+    <!-- Scripts carregados APÓS o HTML -->
     <script src="calendar.js"></script>
+    <script src="script.js"></script>
+    <script>
+        // Garantir que o splash screen seja removido após carregar
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                const splash = document.getElementById('splashScreen');
+                if (splash) splash.style.display = 'none';
+            }, 2000);
+        });
+    </script>
 </body>
 </html>
