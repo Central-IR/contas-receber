@@ -19,7 +19,6 @@ const meses = [
 
 console.log('🚀 Contas a Receber iniciada');
 
-// Esperar o DOM estar pronto antes de inicializar
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', verificarAutenticacao);
 } else {
@@ -61,7 +60,7 @@ window.changeMonth = function(direction) {
 };
 
 // ============================================
-// MODAL DE CONFIRMAÇÃO - VERSÃO FUNCIONAL
+// MODAL DE CONFIRMAÇÃO
 // ============================================
 function showConfirm(message, options = {}) {
     return new Promise((resolve) => {
@@ -81,8 +80,8 @@ function showConfirm(message, options = {}) {
             <h3 style="color:#1A1A1A;margin:0 0 1rem 0;font-size:1.25rem;">${title}</h3>
             <p style="color:#6B7280;margin:0 0 2rem 0;">${message}</p>
             <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
-                <button id="btnCancel" style="background:#4B5563;color:#fff;border:none;padding:12px 24px;border-radius:8px;cursor:pointer;font-size:0.95rem;font-weight:600;min-width:100px;">${cancelText}</button>
-                <button id="btnConfirm" style="background:#e70000;color:#fff;border:none;padding:12px 24px;border-radius:8px;cursor:pointer;font-size:0.95rem;font-weight:600;min-width:100px;">${confirmText}</button>
+                <button id="btnCancel" style="background:#EF4444;color:#fff;border:none;padding:12px 24px;border-radius:8px;cursor:pointer;font-size:0.95rem;font-weight:600;min-width:100px;">${cancelText}</button>
+                <button id="btnConfirm" style="background:#22C55E;color:#fff;border:none;padding:12px 24px;border-radius:8px;cursor:pointer;font-size:0.95rem;font-weight:600;min-width:100px;">${confirmText}</button>
             </div>
         `;
 
@@ -225,6 +224,23 @@ async function loadContas() {
 }
 
 function mapearConta(conta) {
+    let observacoesArray = [];
+    
+    // Converter observacoes para array se necessário
+    if (conta.observacoes) {
+        if (Array.isArray(conta.observacoes)) {
+            observacoesArray = conta.observacoes;
+        } else if (typeof conta.observacoes === 'string') {
+            try {
+                observacoesArray = JSON.parse(conta.observacoes);
+            } catch {
+                observacoesArray = [{ texto: conta.observacoes, data: new Date().toISOString() }];
+            }
+        } else if (typeof conta.observacoes === 'object') {
+            observacoesArray = [conta.observacoes];
+        }
+    }
+
     return {
         id: conta.id,
         numero_nf: conta.numero_nf || '',
@@ -235,9 +251,9 @@ function mapearConta(conta) {
         data_emissao: conta.data_emissao || '',
         data_vencimento: conta.data_vencimento || '',
         data_pagamento: conta.data_pagamento || null,
-        status: conta.status || 'PENDENTE',
+        status: conta.status || 'A RECEBER',
         tipo_nf: conta.tipo_nf || 'ENVIO',
-        observacoes: conta.observacoes || '',
+        observacoes: observacoesArray,
         created_at: conta.created_at || new Date().toISOString()
     };
 }
@@ -256,8 +272,12 @@ window.sincronizarDados = async function() {
         }
     });
     
-    showMessage('Dados sincronizados', 'success');
-    await loadContas();
+    try {
+        await loadContas();
+        showMessage('Dados sincronizados', 'success');
+    } catch (error) {
+        showMessage('Erro ao sincronizar', 'error');
+    }
     
     setTimeout(() => {
         syncButtons.forEach(btn => {
@@ -279,17 +299,14 @@ function startPolling() {
 // CÁLCULO AUTOMÁTICO DE STATUS
 // ============================================
 function calcularStatus(conta) {
-    // Se for um tipo de NF especial (não é ENVIO), retorna status especial
     if (conta.tipo_nf && conta.tipo_nf !== 'ENVIO') {
         return 'ESPECIAL';
     }
 
-    // Se tem data de pagamento, está pago
     if (conta.data_pagamento) {
         return 'PAGO';
     }
 
-    // Verifica se está vencido
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
     const vencimento = new Date(conta.data_vencimento + 'T00:00:00');
@@ -298,7 +315,7 @@ function calcularStatus(conta) {
         return 'VENCIDO';
     }
 
-    return 'PENDENTE';
+    return 'A RECEBER';
 }
 
 // ============================================
@@ -310,7 +327,6 @@ function updateDashboard() {
         return data.getMonth() === currentMonth && data.getFullYear() === currentYear;
     });
 
-    // Filtra apenas contas do tipo ENVIO para o dashboard
     const contasEnvio = contasMesAtual.filter(c => !c.tipo_nf || c.tipo_nf === 'ENVIO');
 
     const totalFaturado = contasEnvio.reduce((sum, c) => sum + c.valor, 0);
@@ -319,7 +335,9 @@ function updateDashboard() {
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
 
-    const totalVencido = contasEnvio
+    // VENCIDO: conta TODAS as contas vencidas (independente do mês) que não foram pagas
+    const todasContasEnvio = contas.filter(c => !c.tipo_nf || c.tipo_nf === 'ENVIO');
+    const totalVencido = todasContasEnvio
         .filter(c => {
             if (c.status === 'PAGO') return false;
             const dataVencimento = new Date(c.data_vencimento + 'T00:00:00');
@@ -327,7 +345,6 @@ function updateDashboard() {
         })
         .reduce((sum, c) => sum + c.valor, 0);
 
-    // Calcula A Receber como: Faturado - Pago
     const totalReceber = totalFaturado - totalPago;
 
     const statFaturado = document.getElementById('statFaturado');
@@ -355,7 +372,6 @@ function updateDashboard() {
 }
 
 function verificarContasVencidas() {
-    // Verifica se já mostrou notificação nesta sessão
     const jaExibiu = sessionStorage.getItem(NOTIFICATION_KEY);
     if (jaExibiu) return;
 
@@ -363,11 +379,8 @@ function verificarContasVencidas() {
     hoje.setHours(0, 0, 0, 0);
 
     const contasVencidas = contas.filter(c => {
-        // Apenas contas do tipo ENVIO
         if (c.tipo_nf && c.tipo_nf !== 'ENVIO') return false;
-        // Apenas contas não pagas
         if (c.status === 'PAGO') return false;
-        // Verifica vencimento
         const vencimento = new Date(c.data_vencimento + 'T00:00:00');
         return vencimento < hoje;
     });
@@ -503,17 +516,26 @@ function showFormModal(editingId = null) {
         conta = contas.find(c => c.id === editingId);
 
         if (!conta) {
-            showMessage('Conta não encontrada!', 'error');
             return;
         }
     }
+
+    const observacoesHTML = (conta?.observacoes || []).map((obs, index) => `
+        <div class="observacao-item">
+            <div class="observacao-header">
+                <span class="observacao-data">${formatDateTime(obs.data)}</span>
+                <button type="button" class="btn-remove-obs" onclick="removerObservacao(${index})" title="Remover">✕</button>
+            </div>
+            <p class="observacao-texto">${obs.texto}</p>
+        </div>
+    `).join('');
 
     const modalHTML = `
         <div class="modal-overlay" id="formModal" style="display: flex;">
             <div class="modal-content">
                 <div class="modal-header">
                     <h3 class="modal-title">${isEditing ? 'Editar Conta' : 'Nova Conta a Receber'}</h3>
-                    <button class="close-modal" onclick="closeFormModal()">✕</button>
+                    <button class="close-modal" onclick="closeFormModal(false)">✕</button>
                 </div>
                 
                 <div class="tabs-container">
@@ -525,6 +547,7 @@ function showFormModal(editingId = null) {
 
                     <form id="contaForm" onsubmit="handleSubmit(event)">
                         <input type="hidden" id="editId" value="${editingId || ''}">
+                        <input type="hidden" id="observacoesData" value='${JSON.stringify(conta?.observacoes || [])}'>
                         
                         <div class="tab-content active" id="tab-basico">
                             <div class="form-grid">
@@ -554,6 +577,16 @@ function showFormModal(editingId = null) {
                                         <option value="SICOOB" ${conta?.banco === 'SICOOB' ? 'selected' : ''}>SICOOB</option>
                                     </select>
                                 </div>
+                                <div class="form-group">
+                                    <label for="tipo_nf">Tipo de NF *</label>
+                                    <select id="tipo_nf" required>
+                                        <option value="ENVIO" ${!conta?.tipo_nf || conta?.tipo_nf === 'ENVIO' ? 'selected' : ''}>Envio</option>
+                                        <option value="CANCELADA" ${conta?.tipo_nf === 'CANCELADA' ? 'selected' : ''}>Cancelada</option>
+                                        <option value="REMESSA_AMOSTRA" ${conta?.tipo_nf === 'REMESSA_AMOSTRA' ? 'selected' : ''}>Remessa de Amostra</option>
+                                        <option value="SIMPLES_REMESSA" ${conta?.tipo_nf === 'SIMPLES_REMESSA' ? 'selected' : ''}>Simples Remessa</option>
+                                        <option value="DEVOLUCAO" ${conta?.tipo_nf === 'DEVOLUCAO' ? 'selected' : ''}>Devolução</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
 
@@ -579,27 +612,26 @@ function showFormModal(editingId = null) {
                         </div>
 
                         <div class="tab-content" id="tab-observacoes">
-                            <div class="form-grid">
-                                <div class="form-group">
-                                    <label for="tipo_nf">Tipo de NF *</label>
-                                    <select id="tipo_nf" required>
-                                        <option value="ENVIO" ${!conta?.tipo_nf || conta?.tipo_nf === 'ENVIO' ? 'selected' : ''}>Envio</option>
-                                        <option value="CANCELADA" ${conta?.tipo_nf === 'CANCELADA' ? 'selected' : ''}>Cancelada</option>
-                                        <option value="REMESSA_AMOSTRA" ${conta?.tipo_nf === 'REMESSA_AMOSTRA' ? 'selected' : ''}>Remessa de Amostra</option>
-                                        <option value="SIMPLES_REMESSA" ${conta?.tipo_nf === 'SIMPLES_REMESSA' ? 'selected' : ''}>Simples Remessa</option>
-                                        <option value="DEVOLUCAO" ${conta?.tipo_nf === 'DEVOLUCAO' ? 'selected' : ''}>Devolução</option>
-                                    </select>
+                            <div class="observacoes-section">
+                                <div class="observacoes-list" id="observacoesList">
+                                    ${observacoesHTML || '<p style="color: var(--text-secondary); text-align: center; padding: 2rem;">Nenhuma observação adicionada</p>'}
                                 </div>
-                                <div class="form-group" style="grid-column: 1 / -1;">
-                                    <label for="observacoes">Observações</label>
-                                    <textarea id="observacoes" rows="6">${conta?.observacoes || ''}</textarea>
+                                <div class="nova-observacao">
+                                    <textarea id="novaObservacao" placeholder="Digite uma observação..." rows="3"></textarea>
+                                    <button type="button" class="btn-add-obs" onclick="adicionarObservacao()">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                                        </svg>
+                                        Adicionar Observação
+                                    </button>
                                 </div>
                             </div>
                         </div>
 
                         <div class="modal-actions">
                             <button type="submit" class="save">${isEditing ? 'Atualizar' : 'Salvar'}</button>
-                            <button type="button" class="secondary" onclick="closeFormModal()">Cancelar</button>
+                            <button type="button" class="btn-cancel" onclick="closeFormModal(false)">Cancelar</button>
                         </div>
                     </form>
                 </div>
@@ -609,7 +641,7 @@ function showFormModal(editingId = null) {
 
     document.body.insertAdjacentHTML('beforeend', modalHTML);
 
-    const camposMaiusculas = ['numero_nf', 'orgao', 'observacoes'];
+    const camposMaiusculas = ['numero_nf', 'orgao'];
     camposMaiusculas.forEach(campoId => {
         const campo = document.getElementById(campoId);
         if (campo) {
@@ -624,12 +656,70 @@ function showFormModal(editingId = null) {
     setTimeout(() => document.getElementById('numero_nf')?.focus(), 100);
 }
 
-function closeFormModal() {
+function closeFormModal(saved = false) {
     const modal = document.getElementById('formModal');
     if (modal) {
+        const editId = document.getElementById('editId')?.value;
+        
+        if (!saved) {
+            if (editId) {
+                showMessage('Atualização cancelada', 'error');
+            } else {
+                showMessage('Registro cancelado', 'error');
+            }
+        }
+        
         modal.style.animation = 'fadeOut 0.2s ease forwards';
         setTimeout(() => modal.remove(), 200);
     }
+}
+
+// ============================================
+// OBSERVAÇÕES
+// ============================================
+window.adicionarObservacao = function() {
+    const textarea = document.getElementById('novaObservacao');
+    const texto = textarea.value.trim().toUpperCase();
+    
+    if (!texto) return;
+    
+    const observacoesData = JSON.parse(document.getElementById('observacoesData').value);
+    observacoesData.push({
+        texto: texto,
+        data: new Date().toISOString()
+    });
+    
+    document.getElementById('observacoesData').value = JSON.stringify(observacoesData);
+    textarea.value = '';
+    
+    renderizarObservacoes();
+};
+
+window.removerObservacao = function(index) {
+    const observacoesData = JSON.parse(document.getElementById('observacoesData').value);
+    observacoesData.splice(index, 1);
+    document.getElementById('observacoesData').value = JSON.stringify(observacoesData);
+    renderizarObservacoes();
+};
+
+function renderizarObservacoes() {
+    const observacoesData = JSON.parse(document.getElementById('observacoesData').value);
+    const container = document.getElementById('observacoesList');
+    
+    if (observacoesData.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 2rem;">Nenhuma observação adicionada</p>';
+        return;
+    }
+    
+    container.innerHTML = observacoesData.map((obs, index) => `
+        <div class="observacao-item">
+            <div class="observacao-header">
+                <span class="observacao-data">${formatDateTime(obs.data)}</span>
+                <button type="button" class="btn-remove-obs" onclick="removerObservacao(${index})" title="Remover">✕</button>
+            </div>
+            <p class="observacao-texto">${obs.texto}</p>
+        </div>
+    `).join('');
 }
 
 // ============================================
@@ -654,6 +744,8 @@ window.switchFormTab = function(index) {
 window.handleSubmit = async function(event) {
     if (event) event.preventDefault();
 
+    const observacoesData = JSON.parse(document.getElementById('observacoesData').value);
+
     const formData = {
         numero_nf: document.getElementById('numero_nf').value.trim().toUpperCase(),
         orgao: document.getElementById('orgao').value.trim().toUpperCase(),
@@ -664,17 +756,15 @@ window.handleSubmit = async function(event) {
         data_vencimento: document.getElementById('data_vencimento').value,
         data_pagamento: document.getElementById('data_pagamento').value || null,
         tipo_nf: document.getElementById('tipo_nf').value,
-        observacoes: document.getElementById('observacoes').value.trim().toUpperCase()
+        observacoes: observacoesData
     };
 
-    // Calcula o status automaticamente
     formData.status = calcularStatus(formData);
 
     const editId = document.getElementById('editId').value;
 
     if (!isOnline) {
-        showMessage('Sistema offline. Dados não foram salvos.', 'error');
-        closeFormModal();
+        closeFormModal(false);
         return;
     }
 
@@ -700,8 +790,7 @@ window.handleSubmit = async function(event) {
         }
 
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.details || 'Erro ao salvar');
+            throw new Error('Erro ao salvar');
         }
 
         const savedData = await response.json();
@@ -710,21 +799,19 @@ window.handleSubmit = async function(event) {
         if (editId) {
             const index = contas.findIndex(c => c.id === editId);
             if (index !== -1) contas[index] = mappedData;
-            showMessage('Conta atualizada!', 'success');
         } else {
             contas.push(mappedData);
-            showMessage('Conta criada!', 'success');
+            showMessage(`NF ${formData.numero_nf} registrada`, 'success');
         }
 
         lastDataHash = JSON.stringify(contas.map(c => c.id));
         updateAllFilters();
         updateDashboard();
         filterContas();
-        closeFormModal();
+        closeFormModal(true);
 
     } catch (error) {
         console.error('Erro:', error);
-        showMessage(`Erro: ${error.message}`, 'error');
     }
 };
 
@@ -735,7 +822,6 @@ window.editConta = function(id) {
     const conta = contas.find(c => c.id === id);
 
     if (!conta) {
-        showMessage('Conta não encontrada!', 'error');
         return;
     }
 
@@ -746,6 +832,9 @@ window.editConta = function(id) {
 // EXCLUSÃO
 // ============================================
 window.deleteConta = async function(id) {
+    const conta = contas.find(c => c.id === id);
+    const numeroNf = conta?.numero_nf || '';
+    
     const confirmed = await showConfirm(
         'Tem certeza que deseja excluir esta conta?',
         {
@@ -763,7 +852,7 @@ window.deleteConta = async function(id) {
     updateAllFilters();
     updateDashboard();
     filterContas();
-    showMessage('Conta excluída!', 'success');
+    showMessage(`NF ${numeroNf} excluída`, 'error');
 
     if (isOnline) {
         try {
@@ -783,7 +872,6 @@ window.deleteConta = async function(id) {
                 updateAllFilters();
                 updateDashboard();
                 filterContas();
-                showMessage('Erro ao excluir', 'error');
             }
         }
     }
@@ -796,7 +884,6 @@ window.viewConta = function(id) {
     const conta = contas.find(c => c.id === id);
 
     if (!conta) {
-        showMessage('Conta não encontrada!', 'error');
         return;
     }
 
@@ -807,6 +894,15 @@ window.viewConta = function(id) {
         'SIMPLES_REMESSA': 'Simples Remessa',
         'DEVOLUCAO': 'Devolução'
     };
+
+    const observacoesHTML = (conta.observacoes || []).map(obs => `
+        <div class="observacao-item-view">
+            <div class="observacao-header">
+                <span class="observacao-data">${formatDateTime(obs.data)}</span>
+            </div>
+            <p class="observacao-texto">${obs.texto}</p>
+        </div>
+    `).join('');
 
     const modalHTML = `
         <div class="modal-overlay" id="viewModal" style="display: flex;">
@@ -831,7 +927,7 @@ window.viewConta = function(id) {
                             <p><strong>Vendedor:</strong> ${conta.vendedor}</p>
                             <p><strong>Banco:</strong> ${conta.banco}</p>
                             <p><strong>Tipo de NF:</strong> ${tipoNfLabel[conta.tipo_nf] || conta.tipo_nf}</p>
-                            <p><strong>Status:</strong> <span class="badge status-${conta.status.toLowerCase()}">${conta.status}</span></p>
+                            <p><strong>Status:</strong> <span class="badge status-${conta.status.toLowerCase().replace(' ', '-')}">${conta.status}</span></p>
                         </div>
                     </div>
 
@@ -848,13 +944,15 @@ window.viewConta = function(id) {
                     <div class="tab-content" id="view-tab-observacoes">
                         <div class="info-section">
                             <h4>Observações</h4>
-                            <p>${conta.observacoes || 'Sem observações'}</p>
+                            <div class="observacoes-list-view">
+                                ${observacoesHTML || '<p style="color: var(--text-secondary); text-align: center; padding: 2rem;">Nenhuma observação</p>'}
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <div class="modal-actions">
-                    <button class="secondary" onclick="closeViewModal()">Fechar</button>
+                    <button class="btn-close" onclick="closeViewModal()">Fechar</button>
                 </div>
             </div>
         </div>
@@ -944,7 +1042,6 @@ function filterContas() {
 
     let filtered = [...contas];
 
-    // Filtrar por mês/ano
     filtered = filtered.filter(c => {
         const data = new Date(c.data_emissao + 'T00:00:00');
         return data.getMonth() === currentMonth && data.getFullYear() === currentYear;
@@ -971,7 +1068,6 @@ function filterContas() {
         );
     }
 
-    // Ordena por número da NF em ordem DECRESCENTE (maior primeiro)
     filtered.sort((a, b) => {
         const numA = parseInt(a.numero_nf.replace(/\D/g, '')) || 0;
         const numB = parseInt(b.numero_nf.replace(/\D/g, '')) || 0;
@@ -1013,7 +1109,7 @@ function renderContas(contasToRender) {
                 </thead>
                 <tbody>
                     ${contasToRender.map(c => {
-                        const statusClass = c.status.toLowerCase();
+                        const statusClass = c.status.toLowerCase().replace(' ', '-');
                         const isEspecial = c.tipo_nf && c.tipo_nf !== 'ENVIO';
                         const isEnvio = !c.tipo_nf || c.tipo_nf === 'ENVIO';
                         const isPago = c.status === 'PAGO';
@@ -1063,7 +1159,7 @@ window.togglePago = async function(id) {
     const conta = contas.find(c => c.id === id);
     if (!conta) return;
 
-    const novoStatus = conta.status === 'PAGO' ? 'PENDENTE' : 'PAGO';
+    const novoStatus = conta.status === 'PAGO' ? 'A RECEBER' : 'PAGO';
     const dataPagamento = novoStatus === 'PAGO' ? new Date().toISOString().split('T')[0] : null;
 
     const statusAnterior = conta.status;
@@ -1075,7 +1171,11 @@ window.togglePago = async function(id) {
     updateDashboard();
     filterContas();
 
-    showMessage(`Conta marcada como ${novoStatus}!`, 'success');
+    if (novoStatus === 'PAGO') {
+        showMessage('Pagamento confirmado', 'success');
+    } else {
+        showMessage('Confirmação de pagamento revogada', 'error');
+    }
 
     if (isOnline) {
         try {
@@ -1096,7 +1196,6 @@ window.togglePago = async function(id) {
             const index = contas.findIndex(c => c.id === id);
             if (index !== -1) contas[index] = mapearConta(savedData);
             
-            // Atualiza a renderização após salvar no servidor
             updateDashboard();
             filterContas();
         } catch (error) {
@@ -1104,7 +1203,6 @@ window.togglePago = async function(id) {
             conta.data_pagamento = dataPagamentoAnterior;
             updateDashboard();
             filterContas();
-            showMessage('Erro ao atualizar status', 'error');
         }
     }
 };
@@ -1116,6 +1214,18 @@ function formatDate(dateString) {
     if (!dateString) return '-';
     const date = new Date(dateString + 'T00:00:00');
     return date.toLocaleDateString('pt-BR');
+}
+
+function formatDateTime(isoString) {
+    if (!isoString) return '-';
+    const date = new Date(isoString);
+    return date.toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
 }
 
 function showMessage(message, type) {
