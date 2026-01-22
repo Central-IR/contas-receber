@@ -1101,7 +1101,6 @@ function renderContas(contasToRender) {
                         <th>Vendedor</th>
                         <th>Banco</th>
                         <th>Valor</th>
-                        <th>Vencimento</th>
                         <th>Pagamento</th>
                         <th>Status</th>
                         <th style="text-align: center; min-width: 260px;">Ações</th>
