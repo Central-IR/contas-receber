@@ -59,6 +59,7 @@ body {
     color: var(--text-primary);
     line-height: 1.6;
     overflow-y: scroll;
+    overflow-x: hidden;
 }
 
 /* LOADER */
@@ -77,9 +78,7 @@ body {
     }
 }
 
-/* ============================================
-   SPLASH SCREEN
-   ============================================ */
+/* SPLASH SCREEN */
 .splash-screen {
     position: fixed;
     top: 0;
@@ -111,9 +110,22 @@ body {
 }
 
 .container {
-    max-width: 1800px;
+    max-width: 100%;
+    width: 100%;
     margin: 0 auto;
-    padding: 2rem 2rem 5rem 2rem;
+    padding: 1rem;
+}
+
+@media (min-width: 768px) {
+    .container {
+        padding: 2rem;
+    }
+}
+
+@media (min-width: 1400px) {
+    .container {
+        max-width: 1800px;
+    }
 }
 
 .card {
@@ -143,10 +155,11 @@ body {
     display: flex;
     align-items: center;
     gap: 1rem;
+    flex-wrap: wrap;
 }
 
 h1 {
-    font-size: 2rem;
+    font-size: clamp(1.25rem, 5vw, 2rem);
     font-weight: 700;
     color: var(--text-primary);
     letter-spacing: -0.5px;
@@ -225,9 +238,7 @@ h2 {
     box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4);
 }
 
-/* ============================================
-   SEARCH BAR WITH INTEGRATED FILTERS
-   ============================================ */
+/* SEARCH BAR WITH INTEGRATED FILTERS */
 .search-bar-wrapper {
     margin-bottom: 0.5rem;
 }
@@ -241,6 +252,7 @@ h2 {
     display: flex;
     align-items: center;
     gap: 0.75rem;
+    flex-wrap: wrap;
 }
 
 .search-icon {
@@ -250,13 +262,13 @@ h2 {
 
 .search-bar input {
     flex: 1;
+    min-width: 150px;
     border: none;
     background: transparent;
     padding: 0.5rem;
     color: var(--text-primary);
     font-size: 0.9rem;
     font-family: inherit;
-    min-width: 150px;
 }
 
 .search-bar input:focus {
@@ -273,11 +285,25 @@ h2 {
     align-items: center;
     gap: 0.5rem;
     flex-wrap: wrap;
+    width: 100%;
+}
+
+@media (min-width: 768px) {
+    .search-bar-filters {
+        width: auto;
+    }
 }
 
 .filter-dropdown-inline {
     position: relative;
     min-width: 160px;
+    flex: 1;
+}
+
+@media (min-width: 768px) {
+    .filter-dropdown-inline {
+        flex: 0 0 auto;
+    }
 }
 
 .filter-dropdown-inline select {
@@ -325,6 +351,13 @@ h2 {
     border: 1px solid var(--border-color);
     height: 38px;
     min-width: 160px;
+    flex: 1;
+}
+
+@media (min-width: 768px) {
+    .month-navigation-inline {
+        flex: 0 0 auto;
+    }
 }
 
 .month-nav-arrow {
@@ -371,30 +404,6 @@ h2 {
     color: var(--text-primary);
 }
 
-/* VIEW ICONS */
-.view-icon {
-    background: transparent;
-    border: none;
-    color: var(--text-secondary);
-    cursor: pointer;
-    padding: 0.5rem;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
-}
-
-.view-icon:hover {
-    background: var(--input-bg);
-    color: var(--text-primary);
-}
-
-.view-icon.active {
-    background: var(--input-bg);
-    color: var(--primary);
-}
-
 /* CALENDAR BUTTON */
 .calendar-btn {
     background: transparent;
@@ -428,6 +437,7 @@ h2 {
     z-index: 10000;
     align-items: center;
     justify-content: center;
+    padding: 1rem;
 }
 
 .calendar-modal.show {
@@ -441,7 +451,7 @@ h2 {
     box-shadow: 0 20px 60px var(--shadow);
     border: 1px solid var(--border-color);
     max-width: 400px;
-    width: 90%;
+    width: 100%;
     animation: scaleIn 0.2s ease;
 }
 
@@ -517,6 +527,12 @@ h2 {
     margin-bottom: 1.5rem;
 }
 
+@media (max-width: 640px) {
+    .dashboard-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
 .stat-card {
     background: var(--bg-card);
     padding: 1.25rem;
@@ -579,7 +595,7 @@ h2 {
 }
 
 .stat-value {
-    font-size: 1.75rem;
+    font-size: clamp(1.25rem, 4vw, 1.75rem);
     font-weight: 700;
     color: var(--text-primary);
     line-height: 1;
@@ -608,7 +624,7 @@ h2 {
     font-weight: 500;
 }
 
-/* ALERTA VISUAL - ORDENS ABERTAS */
+/* ALERTA VISUAL */
 .stat-card.has-alert {
     position: relative;
     animation: pulseAlert 2s ease-in-out infinite;
@@ -651,9 +667,7 @@ h2 {
     }
 }
 
-/* ============================================
-   TABLE
-   ============================================ */
+/* TABLE */
 table {
     width: 100%;
     border-collapse: separate;
@@ -680,6 +694,13 @@ td {
     border-bottom: 1px solid var(--border-color);
     font-size: 0.9rem;
     color: var(--text-primary);
+}
+
+@media (max-width: 768px) {
+    th, td {
+        padding: 10px 8px;
+        font-size: 0.8rem;
+    }
 }
 
 tbody tr {
@@ -743,7 +764,7 @@ tbody tr.row-pago:hover {
     white-space: nowrap;
 }
 
-.badge.status-pendente {
+.badge.status-a-receber {
     background: rgba(245, 158, 11, 0.1);
     color: #D97706;
     border: 1px solid rgba(245, 158, 11, 0.2);
@@ -772,6 +793,12 @@ tbody tr.row-pago:hover {
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 1.2rem;
     margin-bottom: 1.5rem;
+}
+
+@media (max-width: 640px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .form-group {
@@ -840,8 +867,17 @@ button.register, button[onclick*="openFormModal"] {
     background: var(--btn-register);
 }
 
-button.danger, button.delete, button[onclick*="deleteOrdem"], .action-btn.delete {
-    background: var(--btn-delete);
+/* BOTÕES VERMELHOS: Cancelar, Fechar, Excluir */
+button.danger, 
+button.delete, 
+button[onclick*="deleteOrdem"], 
+.action-btn.delete,
+.btn-cancel,
+.btn-close,
+button[onclick*="closeFormModal"],
+button[onclick*="closeInfoModal"],
+button[onclick*="closeViewModal"] {
+    background: var(--btn-delete) !important;
 }
 
 button.edit, button[onclick*="editOrdem"], .action-btn.edit {
@@ -856,32 +892,6 @@ button.success, button.save, button[type="submit"], .action-btn.success {
     background: var(--btn-save);
 }
 
-/* BOTÃO PDF - AZUL ESCURO */
-.action-btn.pdf, button[onclick*="generatePDF"] {
-    background: var(--btn-pdf) !important;
-}
-
-.action-btn.pdf:hover, button[onclick*="generatePDF"]:hover {
-    background: #1E40AF !important;
-}
-
-button.secondary {
-    background: #6B7280;
-}
-
-/* BOTÃO VERMELHO PARA FECHAR MODAL VALOR TOTAL */
-.btn-close-red {
-    background: var(--btn-delete) !important;
-}
-
-.btn-close-red:hover {
-    background: #DC2626 !important;
-}
-
-button[onclick*="closeFormModal"], button[onclick*="closeInfoModal"] {
-    background: var(--btn-delete);
-}
-
 button.small {
     padding: 8px 12px;
     font-size: 0.85rem;
@@ -894,14 +904,21 @@ button.small {
     min-width: 70px;
 }
 
-.actions-cell {
-    white-space: nowrap;
-    min-width: 300px;
+@media (max-width: 640px) {
+    .action-btn {
+        padding: 6px 10px;
+        font-size: 0.75rem;
+        min-width: 60px;
+        margin: 0 2px;
+    }
 }
 
-/* ============================================
-   FLOATING MESSAGES
-   ============================================ */
+.actions-cell {
+    white-space: nowrap;
+    min-width: 260px;
+}
+
+/* FLOATING MESSAGES */
 .floating-message {
     position: fixed;
     bottom: 24px;
@@ -915,6 +932,7 @@ button.small {
     border: 1px solid;
     animation: slideInBottom 0.3s ease;
     min-width: 300px;
+    max-width: 90vw;
 }
 
 .floating-message.success {
@@ -947,9 +965,7 @@ button.small {
     }
 }
 
-/* ============================================
-   MODAL
-   ============================================ */
+/* MODAL */
 .modal-overlay {
     display: none;
     position: fixed;
@@ -964,6 +980,7 @@ button.small {
     z-index: 10000;
     opacity: 0;
     animation: fadeIn 0.2s ease forwards;
+    padding: 1rem;
 }
 
 .modal-overlay.show {
@@ -987,7 +1004,7 @@ button.small {
     border-radius: 16px;
     padding: 2rem;
     max-width: 900px;
-    width: 95%;
+    width: 100%;
     max-height: 90vh;
     overflow-y: auto;
     box-shadow: 0 20px 60px var(--shadow);
@@ -996,6 +1013,14 @@ button.small {
     animation: scaleIn 0.2s ease forwards;
     display: flex;
     flex-direction: column;
+}
+
+@media (max-width: 640px) {
+    .modal-content {
+        padding: 1rem;
+        max-width: 100%;
+        max-height: 95vh;
+    }
 }
 
 .modal-content.alert-modal {
@@ -1047,7 +1072,7 @@ button.small {
 }
 
 .modal-title {
-    font-size: 1.5rem;
+    font-size: clamp(1.1rem, 4vw, 1.5rem);
     font-weight: 700;
     color: var(--text-primary);
     margin: 0;
@@ -1071,15 +1096,6 @@ button.small {
     background: transparent !important;
 }
 
-.close-modal:active {
-    background: transparent !important;
-}
-
-.close-modal:focus {
-    outline: none;
-    background: transparent !important;
-}
-
 /* SISTEMA DE ABAS */
 .tabs-container {
     margin-bottom: 1.5rem;
@@ -1092,7 +1108,6 @@ button.small {
     margin-bottom: 1.5rem;
     overflow-x: auto;
     scrollbar-width: thin;
-    flex-wrap: wrap;
 }
 
 .tab-btn {
@@ -1109,6 +1124,13 @@ button.small {
     margin: 0;
     border-radius: 0;
     pointer-events: auto;
+}
+
+@media (max-width: 640px) {
+    .tab-btn {
+        padding: 10px 15px;
+        font-size: 0.8rem;
+    }
 }
 
 .tab-btn:hover {
@@ -1149,11 +1171,22 @@ button.small {
     margin-top: 1.5rem;
     padding-top: 0;
     border-top: none;
+    flex-wrap: wrap;
 }
 
 .modal-actions button {
     margin: 0;
     min-width: 120px;
+}
+
+@media (max-width: 640px) {
+    .modal-actions {
+        flex-direction: column-reverse;
+    }
+    
+    .modal-actions button {
+        width: 100%;
+    }
 }
 
 .info-section {
@@ -1173,107 +1206,97 @@ button.small {
     line-height: 1.6;
 }
 
+/* OBSERVAÇÕES */
+.observacoes-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.observacoes-list, .observacoes-list-view {
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 1rem;
+    background: var(--input-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.observacao-item, .observacao-item-view {
+    background: var(--bg-card);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--border-color);
+}
+
+.observacao-item:last-child, .observacao-item-view:last-child {
+    margin-bottom: 0;
+}
+
+.observacao-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.observacao-data {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.observacao-texto {
+    color: var(--text-primary);
+    line-height: 1.5;
+    margin: 0;
+}
+
+.nova-observacao {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.btn-add-obs {
+    background: var(--btn-register);
+    align-self: flex-start;
+}
+
+.btn-remove-obs {
+    background: transparent;
+    border: none;
+    color: var(--btn-delete);
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.btn-remove-obs:hover {
+    background: rgba(239, 68, 68, 0.1);
+}
+
 .hidden {
     display: none !important;
 }
 
-/* ============================================
-   RESPONSIVE
-   ============================================ */
-@media (max-width: 768px) {
+/* RESPONSIVIDADE EXTRA */
+@media (max-width: 1024px) {
     .container {
-        padding: 0 1rem 5rem 1rem;
-        margin: 1rem auto;
-    }
-    
-    .header {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .header-left {
-        width: 100%;
-        justify-content: space-between;
-    }
-    
-    .btn-new-order-header {
-        width: 100%;
-        justify-content: center;
-    }
-    
-    h1 {
-        font-size: 1.5rem;
-    }
-    
-    .search-bar {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 0.5rem;
-    }
-    
-    .search-bar input {
-        width: 100%;
-        min-width: unset;
-    }
-    
-    .search-bar-filters {
-        width: 100%;
-        flex-direction: column;
-    }
-    
-    .filter-dropdown-inline {
-        width: 100%;
-    }
-    
-    .month-navigation-inline {
-        width: 100%;
-        justify-content: space-between;
-    }
-    
-    .dashboard-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-    
-    table {
-        font-size: 0.85rem;
-    }
-    
-    th, td {
-        padding: 10px 8px;
-    }
-    
-    button {
-        padding: 10px 16px;
-        font-size: 0.9rem;
-    }
-    
-    .form-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .modal-content {
         padding: 1.5rem;
-        width: 95%;
     }
-    
-    .modal-actions {
-        flex-direction: column-reverse;
-    }
-    
-    .modal-actions button {
-        width: 100%;
-    }
-    
-    .tabs-nav {
-        flex-wrap: nowrap;
-    }
-    
-    .tab-btn {
-        font-size: 0.8rem;
-        padding: 10px 15px;
-    }
-    
-    .actions-cell {
-        min-width: auto;
+}
+
+@media (max-width: 640px) {
+    .floating-message {
+        bottom: 10px;
+        right: 10px;
+        left: 10px;
+        max-width: none;
     }
 }
