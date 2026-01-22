@@ -327,6 +327,17 @@ function updateDashboard() {
         return data.getMonth() === currentMonth && data.getFullYear() === currentYear;
     });
 
+       const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+    const totalFaturado = contasMesAtual
+        .filter(c => !c.tipo_nf || c.tipo_nf === 'ENVIO')
+        .reduce((sum, c) => sum + c.valor, 0);
+
+    const totalPago = contasMesAtual
+        .filter(c => c.status === 'PAGO' && (!c.tipo_nf || c.tipo_nf === 'ENVIO'))
+        .reduce((sum, c) => sum + c.valor, 0);
+
     // VENCIDO: conta TODAS as contas vencidas (independente do mês) que não foram pagas
 const todasContasEnvio = contas.filter(c => !c.tipo_nf || c.tipo_nf === 'ENVIO');
 
