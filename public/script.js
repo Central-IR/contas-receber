@@ -1130,7 +1130,6 @@ function renderContas(contasToRender) {
                             <td>${c.vendedor}</td>
                             <td>${c.banco}</td>
                             <td><strong>${formatCurrency(c.valor)}</strong></td>
-                            <td>${formatDate(c.data_vencimento)}</td>
                             <td>${c.data_pagamento ? formatDate(c.data_pagamento) : '-'}</td>
                             <td>
                                 <span class="badge status-${isEspecial ? 'especial' : statusClass}">
