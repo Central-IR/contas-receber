@@ -1,54 +1,79 @@
 // ============================================
-// CALENDÁRIO
+// CALENDAR.JS - MODAL DE CALENDÁRIO
 // ============================================
+
 let calendarYear = new Date().getFullYear();
 
+const mesesNomes = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+];
+
+// Função para abrir/fechar modal de calendário
 window.toggleCalendar = function() {
     const modal = document.getElementById('calendarModal');
+    if (!modal) return;
+    
     if (modal.classList.contains('show')) {
         modal.classList.remove('show');
     } else {
-        calendarYear = currentYear;
-        updateCalendarView();
+        renderCalendarMonths();
         modal.classList.add('show');
     }
 };
 
+// Função para mudar o ano no calendário
 window.changeCalendarYear = function(direction) {
     calendarYear += direction;
-    updateCalendarView();
+    document.getElementById('calendarYear').textContent = calendarYear;
+    renderCalendarMonths();
 };
 
-function updateCalendarView() {
-    document.getElementById('calendarYear').textContent = calendarYear;
+// Função para renderizar os meses do calendário
+function renderCalendarMonths() {
+    const container = document.getElementById('calendarMonths');
+    if (!container) return;
     
-    const monthsContainer = document.getElementById('calendarMonths');
+    container.innerHTML = '';
     
-    monthsContainer.innerHTML = meses.map((mes, index) => {
-        const isCurrent = index === currentMonth && calendarYear === currentYear;
-        return `
-            <div class="calendar-month ${isCurrent ? 'current' : ''}" onclick="selectMonth(${index})">
-                ${mes}
-            </div>
-        `;
-    }).join('');
+    mesesNomes.forEach((mes, index) => {
+        const monthDiv = document.createElement('div');
+        monthDiv.className = 'calendar-month';
+        monthDiv.textContent = mes;
+        
+        // Marcar mês atual se for o ano corrente
+        if (calendarYear === new Date().getFullYear() && index === new Date().getMonth()) {
+            monthDiv.classList.add('current');
+        }
+        
+        // Ao clicar, seleciona o mês e fecha o modal
+        monthDiv.onclick = () => selectMonth(index);
+        
+        container.appendChild(monthDiv);
+    });
 }
 
-window.selectMonth = function(monthIndex) {
-    currentMonth = monthIndex;
-    currentYear = calendarYear;
-    updateMonthDisplay();
-    toggleCalendar();
-};
-
-// Fechar calendário ao clicar fora
-document.addEventListener('click', (e) => {
-    const calendarModal = document.getElementById('calendarModal');
-    const calendarBtn = document.querySelector('.calendar-btn');
-    
-    if (calendarModal && calendarModal.classList.contains('show')) {
-        if (!calendarModal.contains(e.target) && !calendarBtn.contains(e.target)) {
-            toggleCalendar();
+// Função para selecionar um mês
+function selectMonth(monthIndex) {
+    // Verifica se as variáveis globais existem
+    if (typeof currentMonth !== 'undefined' && typeof currentYear !== 'undefined') {
+        currentMonth = monthIndex;
+        currentYear = calendarYear;
+        
+        // Atualiza a interface se as funções existirem
+        if (typeof updateMonthDisplay === 'function') {
+            updateMonthDisplay();
         }
+    }
+    
+    // Fecha o modal
+    toggleCalendar();
+}
+
+// Fechar modal ao clicar fora dele
+document.addEventListener('click', function(e) {
+    const modal = document.getElementById('calendarModal');
+    if (modal && e.target === modal) {
+        toggleCalendar();
     }
 });
