@@ -469,13 +469,11 @@ window.showVencidosModal = function() {
     });
 
     if (contasVencidas.length === 0) {
-        showMessage('Não há contas vencidas no momento!', 'error'); // MUDANÇA: 'success' → 'error'
+        showMessage('Não há contas vencidas no momento!', 'error');
         return;
     }
 
-    const totalVencido = contasVencidas.reduce((sum, c) => sum + c.valor, 0);
-
-    // NOVA TABELA - Formato igual à tabela principal
+    // TABELA - Formato igual à tabela principal
     const tabelaHTML = `
         <div style="overflow-x: auto; margin-top: 1rem;">
             <table>
@@ -502,15 +500,9 @@ window.showVencidosModal = function() {
     `;
 
     const bodyHTML = `
-        <h3 style="color: #EF4444; margin: 0 0 1rem 0;">
+        <h3 style="color: #EF4444; margin: 0 0 1.5rem 0;">
             Contas Vencidas (${contasVencidas.length})
         </h3>
-        <div style="background: #FEF3C7; border-left: 4px solid #F59E0B; padding: 1rem; margin-bottom: 1.5rem; border-radius: 4px;">
-            <p style="margin: 0; color: #92400E; font-weight: 600;">Total Vencido:</p>
-            <p style="margin: 0.5rem 0 0 0; font-size: 1.75rem; font-weight: bold; color: #EF4444;">
-                ${formatCurrency(totalVencido)}
-            </p>
-        </div>
         ${tabelaHTML}
     `;
 
@@ -520,6 +512,14 @@ window.showVencidosModal = function() {
     if (modalBody && modal) {
         modalBody.innerHTML = bodyHTML;
         modal.style.display = 'flex';
+    }
+};
+
+// ADICIONE ESTA FUNÇÃO PARA FECHAR O MODAL
+window.closeVencidosModal = function() {
+    const modal = document.getElementById('vencidosModal');
+    if (modal) {
+        modal.style.display = 'none';
     }
 };
 
