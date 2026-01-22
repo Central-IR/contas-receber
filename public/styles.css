@@ -527,6 +527,7 @@ h2 {
     align-items: center;
     gap: 1rem;
     transition: all 0.2s ease;
+    position: relative;
 }
 
 .stat-card:hover {
@@ -703,49 +704,32 @@ tbody tr.row-entregue:hover {
     background: rgba(34, 197, 94, 0.18) !important;
 }
 
-/* Checkbox Customizado */
-.checkbox-wrapper {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.styled-checkbox {
-    position: absolute;
-    opacity: 0;
-    cursor: pointer;
-    width: 40px;
-    height: 40px;
-}
-
-.checkbox-label-styled {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    border: 2px solid var(--border-color);
+/* BOTÃO DE CHECK */
+.check-btn {
+    width: 36px;
+    height: 36px;
     border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s ease;
+    border: 2px solid var(--border-color);
     background: var(--input-bg);
+    color: transparent;
+    cursor: pointer;
+    font-size: 1.1rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
 }
 
-.checkbox-label-styled:hover {
-    border-color: var(--primary);
-    background: rgba(204, 112, 0, 0.05);
+.check-btn:hover {
+    border-color: var(--success-color);
+    background: rgba(34, 197, 94, 0.1);
 }
 
-.styled-checkbox:checked + .checkbox-label-styled {
+.check-btn.checked {
     background: var(--success-color);
     border-color: var(--success-color);
-}
-
-.styled-checkbox:checked + .checkbox-label-styled::after {
-    content: '✓';
     color: white;
-    font-size: 1rem;
-    font-weight: 700;
 }
 
 /* Badge de status */
@@ -758,25 +742,25 @@ tbody tr.row-entregue:hover {
     white-space: nowrap;
 }
 
-.badge.transito {
-    background: rgba(59, 130, 246, 0.1);
-    color: #2563EB;
-    border: 1px solid rgba(59, 130, 246, 0.2);
+.badge.status-pendente {
+    background: rgba(245, 158, 11, 0.1);
+    color: #D97706;
+    border: 1px solid rgba(245, 158, 11, 0.2);
 }
 
-.badge.entregue {
+.badge.status-pago {
     background: rgba(34, 197, 94, 0.1);
     color: #16A34A;
     border: 1px solid rgba(34, 197, 94, 0.2);
 }
 
-.badge.devolvido {
+.badge.status-vencido {
     background: rgba(239, 68, 68, 0.1);
     color: #DC2626;
     border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
-.badge.cancelado, .badge.badge-especial {
+.badge.status-especial {
     background: rgba(107, 114, 128, 0.1);
     color: #4B5563;
     border: 1px solid rgba(107, 114, 128, 0.2);
@@ -991,6 +975,12 @@ button.small {
     }
 }
 
+@keyframes fadeOut {
+    to {
+        opacity: 0;
+    }
+}
+
 .modal-content {
     background: var(--bg-card);
     border-radius: 16px;
@@ -1007,21 +997,14 @@ button.small {
     flex-direction: column;
 }
 
-.modal-content.valor-total-modal {
-    overflow-y: visible;
-}
-
 .modal-content.alert-modal {
     overflow-y: auto;
+    max-width: 700px;
 }
 
 .modal-body {
     flex: 1;
     overflow-y: auto;
-}
-
-.valor-total-modal .modal-body {
-    overflow-y: visible;
 }
 
 @keyframes scaleIn {
@@ -1030,174 +1013,13 @@ button.small {
     }
 }
 
-/* MODAL ESPECIAL PARA VALOR TOTAL - VERSÃO SIMPLIFICADA */
-.valor-total-modal {
-    max-width: 1200px;
-    max-height: 90vh;
-}
-
-.modal-body-valores {
-    flex: 1;
-    overflow-y: hidden;
-    padding: 1.5rem;
-}
-
-/* CONTAINER SEMESTRAL - 6 MESES POR LINHA */
-.valores-container-semestral {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-}
-
-.semestre-row {
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    gap: 0.75rem;
-}
-
-/* CARD SIMPLIFICADO DE MÊS */
-.valor-mes-card-simple {
-    background: var(--bg-card);
-    border: 2px solid var(--border-color);
-    border-radius: 10px;
-    padding: 1rem 0.75rem;
-    text-align: center;
-    transition: all 0.2s ease;
-}
-
-.valor-mes-card-simple:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    border-color: var(--primary);
-}
-
-.mes-nome {
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: var(--primary);
-    margin-bottom: 0.75rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 2px solid var(--border-color);
-}
-
-.mes-valores {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.mes-valor-item {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.25rem;
-}
-
-.valor-num {
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: var(--text-primary);
-}
-
-.frete-color {
-    color: var(--text-primary);
-}
-
-.valor-color {
-    color: var(--text-primary);
-}
-
-/* SETAS DE TENDÊNCIA SIMPLIFICADAS */
-.trend-simple {
-    font-size: 1rem;
-    font-weight: 700;
-    line-height: 1;
-}
-
-.trend-simple.trend-up {
-    color: #22C55E;
-}
-
-.trend-simple.trend-down {
-    color: #EF4444;
-}
-
-/* TOTAIS SIMPLIFICADOS */
-.valores-totais-simple {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
-    padding-top: 1.5rem;
-    border-top: 3px solid var(--border-color);
-}
-
-.total-box {
-    background: var(--input-bg);
-    border: 2px solid var(--border-color);
-    border-radius: 10px;
-    padding: 1.25rem;
-    text-align: center;
-}
-
-.total-label-simple {
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: var(--text-secondary);
-    margin-bottom: 0.5rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.total-value-simple {
-    font-size: 1.75rem;
-    font-weight: 700;
-    line-height: 1;
-}
-
-.frete-total-box .total-value-simple {
-    color: var(--info-color);
-}
-
-.valor-total-box .total-value-simple {
-    color: var(--success-color);
-}
-
-/* MODAL ESPECIAL PARA ALERTA */
-.alert-modal {
-    max-width: 700px;
-}
-
-.modal-header-valor-total {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.5rem;
-    padding-bottom: 0;
-    border-bottom: none;
-}
-
 .modal-header-alert {
     padding: 0 0 1rem 0;
     margin-bottom: 1.5rem;
     border-bottom: none;
     display: flex;
-    justify-content: flex-start;
+    justify-content: space-between;
     align-items: center;
-}
-
-.modal-actions-valor-total {
-    display: flex;
-    gap: 0.75rem;
-    justify-content: flex-end;
-    margin-top: 1.5rem;
-    padding-top: 0;
-    border-top: none;
-}
-
-.modal-actions-valor-total button {
-    margin: 0;
-    min-width: 120px;
 }
 
 .modal-actions-alert {
@@ -1350,115 +1172,6 @@ button.small {
     line-height: 1.6;
 }
 
-/* OBSERVAÇÕES */
-.observacoes-section {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-}
-
-.observacoes-list, .observacoes-list-view {
-    max-height: 400px;
-    overflow-y: auto;
-    padding: 1rem;
-    background: var(--input-bg);
-    border-radius: 8px;
-    border: 1px solid var(--border-color);
-}
-
-.observacao-item, .observacao-item-view {
-    background: var(--bg-card);
-    padding: 1rem;
-    border-radius: 8px;
-    margin-bottom: 0.75rem;
-    border: 1px solid var(--border-color);
-}
-
-.observacao-item:last-child, .observacao-item-view:last-child {
-    margin-bottom: 0;
-}
-
-.observacao-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.5rem;
-}
-
-.observacao-data {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    font-weight: 600;
-}
-
-.observacao-texto {
-    color: var(--text-primary);
-    line-height: 1.5;
-    margin: 0;
-}
-
-.nova-observacao {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-}
-
-.btn-add-obs {
-    background: var(--btn-register);
-    align-self: flex-start;
-}
-
-.btn-remove-obs {
-    background: transparent;
-    border: none;
-    color: var(--btn-delete);
-    cursor: pointer;
-    padding: 0.25rem;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
-}
-
-.btn-remove-obs:hover {
-    background: rgba(239, 68, 68, 0.1);
-}
-
-/* TABELA DE ITENS */
-.items-table {
-    width: 100%;
-    margin: 1rem 0;
-}
-
-.items-table th, .items-table td {
-    padding: 10px;
-    border: 1px solid var(--border-color);
-}
-
-.items-table input, .items-table textarea {
-    padding: 8px;
-}
-
-.items-table textarea {
-    min-height: 60px;
-}
-
-/* INDICADORES DE TENDÊNCIA */
-.trend-indicator {
-    display: inline-flex;
-    align-items: center;
-    margin-left: 0.5rem;
-}
-
-.trend-up {
-    color: #22C55E;
-}
-
-.trend-down {
-    color: #EF4444;
-}
-
 .hidden {
     display: none !important;
 }
@@ -1561,39 +1274,5 @@ button.small {
     
     .actions-cell {
         min-width: auto;
-    }
-    
-    /* Valores Mensais - Layout 6+6 Responsivo */
-    .semestre-row {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 0.5rem;
-    }
-    
-    .valor-mes-card-simple {
-        padding: 0.75rem 0.5rem;
-    }
-    
-    .mes-nome {
-        font-size: 0.75rem;
-    }
-    
-    .valor-num {
-        font-size: 0.75rem;
-    }
-    
-    .valores-totais-simple {
-        grid-template-columns: 1fr;
-    }
-    
-    .total-value-simple {
-        font-size: 1.35rem;
-    }
-    
-    .modal-body-valores {
-        padding: 1rem;
-    }
-    
-    .valor-total-modal {
-        max-width: 95%;
     }
 }
