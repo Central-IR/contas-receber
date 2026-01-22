@@ -29,7 +29,7 @@
                         <line x1="12" y1="5" x2="12" y2="19"></line>
                         <line x1="5" y1="12" x2="19" y2="12"></line>
                     </svg>
-                    Registrar Conta
+                    + Nova Conta
                 </button>
             </div>
 
@@ -126,7 +126,7 @@
                             </svg>
                         </div>
                         <div class="month-navigation-inline">
-                            <button onclick="changeMonth(-1)" class="month-nav-arrow" title="MÃªs anterior">
+                            <button onclick="changeMonth(-1)" class="month-nav-arrow" title="Mês anterior">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <polyline points="15 18 9 12 15 6"></polyline>
                                 </svg>
@@ -134,7 +134,7 @@
                             <div class="month-display-inline">
                                 <span id="currentMonth">Carregando...</span>
                             </div>
-                            <button onclick="changeMonth(1)" class="month-nav-arrow" title="PrÃ³ximo mÃªs">
+                            <button onclick="changeMonth(1)" class="month-nav-arrow" title="Próximo mês">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <polyline points="9 18 15 12 9 6"></polyline>
                                 </svg>
@@ -142,7 +142,7 @@
                         </div>
                     </div>
 
-                    <button class="calendar-btn" onclick="toggleCalendar()" title="Selecionar mÃªs">
+                    <button class="calendar-btn" onclick="toggleCalendar()" title="Selecionar mês">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
                             <line x1="16" y1="2" x2="16" y2="6"></line>
@@ -196,6 +196,7 @@
                     <line x1="12" y1="9" x2="12" y2="13"></line>
                     <line x1="12" y1="17" x2="12.01" y2="17"></line>
                 </svg>
+                <button class="close-modal" onclick="closeVencidosModal()">✕</button>
             </div>
             
             <div class="modal-body" id="vencidosModalBody"></div>
@@ -213,5 +214,6 @@
         }, 3000);
     </script>
     <script src="script.js"></script>
+    <script src="calendar.js"></script>
 </body>
 </html>
