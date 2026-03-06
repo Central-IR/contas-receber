@@ -58,7 +58,7 @@ body {
     background: var(--bg-secondary);
     color: var(--text-primary);
     line-height: 1.6;
-    overflow-y: scroll;
+    overflow-y: auto; /* Permite scroll vertical quando necessário, mas evitamos barras horizontais */
     overflow-x: hidden;
 }
 
@@ -1078,6 +1078,7 @@ button.small {
     margin: 0;
 }
 
+/* BOTÃO FECHAR (X) - SEM FUNDO COLORIDO */
 .close-modal {
     background: transparent !important;
     border: none;
@@ -1088,6 +1089,9 @@ button.small {
     margin: 0;
     width: 32px;
     height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     transition: color 0.2s ease;
 }
 
@@ -1108,6 +1112,7 @@ button.small {
     margin-bottom: 1.5rem;
     overflow-x: auto;
     scrollbar-width: thin;
+    flex-wrap: wrap; /* Permite quebra em telas pequenas */
 }
 
 .tab-btn {
