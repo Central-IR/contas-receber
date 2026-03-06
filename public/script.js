@@ -336,7 +336,7 @@ function calcularStatus(conta) {
 }
 
 // ============================================
-// DASHBOARD (com valor_pago)
+// DASHBOARD (com valor_pago e quantidade vencida)
 // ============================================
 function updateDashboard() {
     const contasMesAtual = contas.filter(c => {
@@ -357,16 +357,8 @@ function updateDashboard() {
         .filter(c => !c.tipo_nf || c.tipo_nf === 'ENVIO')
         .reduce((sum, c) => sum + (c.valor_pago || 0), 0);
 
-    // VENCIDO: soma dos valores das contas vencidas não pagas (considerando todas, não só do mês)
+    // QUANTIDADE de contas vencidas (considera todas as contas, não só do mês)
     const todasContasEnvio = contas.filter(c => !c.tipo_nf || c.tipo_nf === 'ENVIO');
-
-    const totalVencido = todasContasEnvio
-        .filter(c => {
-            if (c.status === 'PAGO') return false;
-            const dataVencimento = new Date(c.data_vencimento + 'T00:00:00');
-            return dataVencimento < hoje;
-        })
-        .reduce((sum, c) => sum + c.valor, 0);
 
     const quantidadeVencidas = todasContasEnvio
         .filter(c => {
@@ -374,6 +366,15 @@ function updateDashboard() {
             const dataVencimento = new Date(c.data_vencimento + 'T00:00:00');
             return dataVencimento < hoje;
         }).length;
+
+    // Total vencido (valor) – usado apenas para badge/alerta, não exibido no card principal
+    const totalVencido = todasContasEnvio
+        .filter(c => {
+            if (c.status === 'PAGO') return false;
+            const dataVencimento = new Date(c.data_vencimento + 'T00:00:00');
+            return dataVencimento < hoje;
+        })
+        .reduce((sum, c) => sum + c.valor, 0);
 
     const totalReceber = totalFaturado - totalPago;
 
@@ -384,7 +385,7 @@ function updateDashboard() {
 
     if (statFaturado) statFaturado.textContent = formatCurrency(totalFaturado);
     if (statPago) statPago.textContent = formatCurrency(totalPago);
-    if (statVencido) statVencido.textContent = formatCurrency(totalVencido);
+    if (statVencido) statVencido.textContent = quantidadeVencidas; // ← APENAS O NÚMERO
     if (statReceber) statReceber.textContent = formatCurrency(totalReceber);
 
     const badgeVencido = document.getElementById('pulseBadgeVencido');
@@ -398,26 +399,6 @@ function updateDashboard() {
             badgeVencido.style.display = 'none';
             cardVencido.classList.remove('has-alert');
         }
-    }
-}
-
-function verificarContasVencidas() {
-    const jaExibiu = sessionStorage.getItem(NOTIFICATION_KEY);
-    if (jaExibiu) return;
-
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-
-    const contasVencidas = contas.filter(c => {
-        if (c.tipo_nf && c.tipo_nf !== 'ENVIO') return false;
-        if (c.status === 'PAGO') return false;
-        const vencimento = new Date(c.data_vencimento + 'T00:00:00');
-        return vencimento < hoje;
-    });
-
-    if (contasVencidas.length > 0) {
-        mostrarNotificacaoVencidos(contasVencidas);
-        sessionStorage.setItem(NOTIFICATION_KEY, 'true');
     }
 }
 
