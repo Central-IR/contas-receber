@@ -11,6 +11,8 @@ let lastDataHash = '';
 let sessionToken = null;
 let currentMonth = new Date().getMonth();
 let currentYear = new Date().getFullYear();
+let currentTabIndex = 0; // Para navegação entre abas
+const tabs = ['tab-basico', 'tab-valores', 'tab-observacoes']; // IDs das abas no formulário
 
 const meses = [
     'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -136,6 +138,20 @@ async function inicializarApp() {
     setInterval(checkServerStatus, 15000);
     await loadContas();
     startPolling();
+
+    // Listener para salvar com Enter
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            const formModal = document.getElementById('formModal');
+            if (formModal && formModal.style.display === 'flex') {
+                const activeElement = document.activeElement;
+                if (activeElement && activeElement.tagName !== 'TEXTAREA') {
+                    e.preventDefault();
+                    handleSubmit(e);
+                }
+            }
+        }
+    });
 }
 
 // ============================================
@@ -248,6 +264,7 @@ function mapearConta(conta) {
         vendedor: conta.vendedor || '',
         banco: conta.banco || '',
         valor: parseFloat(conta.valor) || 0,
+        valor_pago: parseFloat(conta.valor_pago) || 0, // NOVO CAMPO
         data_emissao: conta.data_emissao || '',
         data_vencimento: conta.data_vencimento || '',
         data_pagamento: conta.data_pagamento || null,
@@ -319,7 +336,7 @@ function calcularStatus(conta) {
 }
 
 // ============================================
-// DASHBOARD
+// DASHBOARD (com valor_pago)
 // ============================================
 function updateDashboard() {
     const contasMesAtual = contas.filter(c => {
@@ -327,60 +344,61 @@ function updateDashboard() {
         return data.getMonth() === currentMonth && data.getFullYear() === currentYear;
     });
 
-       const hoje = new Date();
+    const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
 
+    // Total faturado (soma dos valores das NFs de envio)
     const totalFaturado = contasMesAtual
         .filter(c => !c.tipo_nf || c.tipo_nf === 'ENVIO')
         .reduce((sum, c) => sum + c.valor, 0);
 
+    // Total pago (soma dos valores pagos, independente do status)
     const totalPago = contasMesAtual
-        .filter(c => c.status === 'PAGO' && (!c.tipo_nf || c.tipo_nf === 'ENVIO'))
+        .filter(c => !c.tipo_nf || c.tipo_nf === 'ENVIO')
+        .reduce((sum, c) => sum + (c.valor_pago || 0), 0);
+
+    // VENCIDO: soma dos valores das contas vencidas não pagas (considerando todas, não só do mês)
+    const todasContasEnvio = contas.filter(c => !c.tipo_nf || c.tipo_nf === 'ENVIO');
+
+    const totalVencido = todasContasEnvio
+        .filter(c => {
+            if (c.status === 'PAGO') return false;
+            const dataVencimento = new Date(c.data_vencimento + 'T00:00:00');
+            return dataVencimento < hoje;
+        })
         .reduce((sum, c) => sum + c.valor, 0);
 
-    // VENCIDO: conta TODAS as contas vencidas (independente do mês) que não foram pagas
-const todasContasEnvio = contas.filter(c => !c.tipo_nf || c.tipo_nf === 'ENVIO');
+    const quantidadeVencidas = todasContasEnvio
+        .filter(c => {
+            if (c.status === 'PAGO') return false;
+            const dataVencimento = new Date(c.data_vencimento + 'T00:00:00');
+            return dataVencimento < hoje;
+        }).length;
 
-// Calcula a QUANTIDADE de contas vencidas
-const quantidadeVencidas = todasContasEnvio.filter(c => {
-    if (c.status === 'PAGO') return false;
-    const dataVencimento = new Date(c.data_vencimento + 'T00:00:00');
-    return dataVencimento < hoje;
-}).length;
+    const totalReceber = totalFaturado - totalPago;
 
-// Calcula o VALOR total vencido (para usar no badge/alerta)
-const totalVencido = todasContasEnvio
-    .filter(c => {
-        if (c.status === 'PAGO') return false;
-        const dataVencimento = new Date(c.data_vencimento + 'T00:00:00');
-        return dataVencimento < hoje;
-    })
-    .reduce((sum, c) => sum + c.valor, 0);
+    const statFaturado = document.getElementById('statFaturado');
+    const statPago = document.getElementById('statPago');
+    const statVencido = document.getElementById('statVencido');
+    const statReceber = document.getElementById('statReceber');
 
-const totalReceber = totalFaturado - totalPago;
+    if (statFaturado) statFaturado.textContent = formatCurrency(totalFaturado);
+    if (statPago) statPago.textContent = formatCurrency(totalPago);
+    if (statVencido) statVencido.textContent = formatCurrency(totalVencido);
+    if (statReceber) statReceber.textContent = formatCurrency(totalReceber);
 
-const statFaturado = document.getElementById('statFaturado');
-const statPago = document.getElementById('statPago');
-const statVencido = document.getElementById('statVencido');
-const statReceber = document.getElementById('statReceber');
+    const badgeVencido = document.getElementById('pulseBadgeVencido');
+    const cardVencido = document.getElementById('cardVencido');
 
-if (statFaturado) statFaturado.textContent = formatCurrency(totalFaturado);
-if (statPago) statPago.textContent = formatCurrency(totalPago);
-if (statVencido) statVencido.textContent = quantidadeVencidas; // ← MUDANÇA AQUI
-if (statReceber) statReceber.textContent = formatCurrency(totalReceber);
-
-const badgeVencido = document.getElementById('pulseBadgeVencido');
-const cardVencido = document.getElementById('cardVencido');
-
-if (badgeVencido && cardVencido) {
-    if (quantidadeVencidas > 0) { // ← Usar quantidade ao invés de valor
-        badgeVencido.style.display = 'flex';
-        cardVencido.classList.add('has-alert');
-    } else {
-        badgeVencido.style.display = 'none';
-        cardVencido.classList.remove('has-alert');
+    if (badgeVencido && cardVencido) {
+        if (quantidadeVencidas > 0) {
+            badgeVencido.style.display = 'flex';
+            cardVencido.classList.add('has-alert');
+        } else {
+            badgeVencido.style.display = 'none';
+            cardVencido.classList.remove('has-alert');
+        }
     }
-}
 }
 
 function verificarContasVencidas() {
@@ -473,7 +491,6 @@ window.showVencidosModal = function() {
         return;
     }
 
-    // TABELA - Formato igual à tabela principal
     const tabelaHTML = `
         <div style="overflow-x: auto; margin-top: 1rem;">
             <table>
@@ -515,7 +532,6 @@ window.showVencidosModal = function() {
     }
 };
 
-// ADICIONE ESTA FUNÇÃO PARA FECHAR O MODAL
 window.closeVencidosModal = function() {
     const modal = document.getElementById('vencidosModal');
     if (modal) {
@@ -524,7 +540,7 @@ window.closeVencidosModal = function() {
 };
 
 // ============================================
-// FORMULÁRIO
+// FORMULÁRIO (com novo campo valor_pago e botões de navegação)
 // ============================================
 window.toggleForm = function() {
     showFormModal(null);
@@ -536,11 +552,11 @@ function showFormModal(editingId = null) {
 
     if (isEditing) {
         conta = contas.find(c => c.id === editingId);
-
-        if (!conta) {
-            return;
-        }
+        if (!conta) return;
     }
+
+    // Reset do índice da aba
+    currentTabIndex = 0;
 
     const observacoesHTML = (conta?.observacoes || []).map((obs, index) => `
         <div class="observacao-item">
@@ -615,8 +631,12 @@ function showFormModal(editingId = null) {
                         <div class="tab-content" id="tab-valores">
                             <div class="form-grid">
                                 <div class="form-group">
-                                    <label for="valor">Valor (R$) *</label>
+                                    <label for="valor">Valor da NF (R$) *</label>
                                     <input type="number" id="valor" step="0.01" min="0" value="${conta?.valor || ''}" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="valor_pago">Valor Pago (R$)</label>
+                                    <input type="number" id="valor_pago" step="0.01" min="0" value="${conta?.valor_pago || '0'}">
                                 </div>
                                 <div class="form-group">
                                     <label for="data_emissao">Data de Emissão *</label>
@@ -652,8 +672,10 @@ function showFormModal(editingId = null) {
                         </div>
 
                         <div class="modal-actions">
-                            <button type="submit" class="save">${isEditing ? 'Atualizar' : 'Salvar'}</button>
-                            <button type="button" class="btn-cancel" onclick="closeFormModal(false)">Cancelar</button>
+                            <button type="button" id="btnPrevious" onclick="previousTab()" class="secondary" style="display: none;">Anterior</button>
+                            <button type="button" id="btnNext" onclick="nextTab()" class="secondary">Próximo</button>
+                            <button type="button" onclick="closeFormModal(false)" class="btn-cancel">Cancelar</button>
+                            <button type="submit" id="btnSave" style="display: none;">${isEditing ? 'Atualizar' : 'Salvar'}</button>
                         </div>
                     </form>
                 </div>
@@ -663,6 +685,7 @@ function showFormModal(editingId = null) {
 
     document.body.insertAdjacentHTML('beforeend', modalHTML);
 
+    // Forçar uppercase em campos específicos
     const camposMaiusculas = ['numero_nf', 'orgao'];
     camposMaiusculas.forEach(campoId => {
         const campo = document.getElementById(campoId);
@@ -675,9 +698,58 @@ function showFormModal(editingId = null) {
         }
     });
 
+    // Atualizar visibilidade dos botões
+    updateNavigationButtons();
+
     setTimeout(() => document.getElementById('numero_nf')?.focus(), 100);
 }
 
+// ============================================
+// NAVEGAÇÃO ENTRE ABAS (Anterior/Próximo)
+// ============================================
+window.switchFormTab = function(index) {
+    currentTabIndex = index;
+    const tabButtons = document.querySelectorAll('#formModal .tab-btn');
+    const tabContents = document.querySelectorAll('#formModal .tab-content');
+
+    tabButtons.forEach((btn, i) => {
+        btn.classList.toggle('active', i === index);
+    });
+
+    tabContents.forEach((content, i) => {
+        content.classList.toggle('active', i === index);
+    });
+
+    updateNavigationButtons();
+};
+
+function nextTab() {
+    if (currentTabIndex < tabs.length - 1) {
+        currentTabIndex++;
+        switchFormTab(currentTabIndex);
+    }
+}
+
+function previousTab() {
+    if (currentTabIndex > 0) {
+        currentTabIndex--;
+        switchFormTab(currentTabIndex);
+    }
+}
+
+function updateNavigationButtons() {
+    const btnPrevious = document.getElementById('btnPrevious');
+    const btnNext = document.getElementById('btnNext');
+    const btnSave = document.getElementById('btnSave');
+
+    if (btnPrevious) btnPrevious.style.display = currentTabIndex === 0 ? 'none' : 'inline-block';
+    if (btnNext) btnNext.style.display = currentTabIndex === tabs.length - 1 ? 'none' : 'inline-block';
+    if (btnSave) btnSave.style.display = currentTabIndex === tabs.length - 1 ? 'inline-block' : 'none';
+}
+
+// ============================================
+// FECHAR MODAL
+// ============================================
 function closeFormModal(saved = false) {
     const modal = document.getElementById('formModal');
     if (modal) {
@@ -745,23 +817,7 @@ function renderizarObservacoes() {
 }
 
 // ============================================
-// SISTEMA DE ABAS
-// ============================================
-window.switchFormTab = function(index) {
-    const tabButtons = document.querySelectorAll('#formModal .tab-btn');
-    const tabContents = document.querySelectorAll('#formModal .tab-content');
-
-    tabButtons.forEach((btn, i) => {
-        btn.classList.toggle('active', i === index);
-    });
-
-    tabContents.forEach((content, i) => {
-        content.classList.toggle('active', i === index);
-    });
-};
-
-// ============================================
-// SUBMIT
+// SUBMIT (salvar)
 // ============================================
 window.handleSubmit = async function(event) {
     if (event) event.preventDefault();
@@ -774,6 +830,7 @@ window.handleSubmit = async function(event) {
         vendedor: document.getElementById('vendedor').value.trim(),
         banco: document.getElementById('banco').value.trim(),
         valor: parseFloat(document.getElementById('valor').value),
+        valor_pago: parseFloat(document.getElementById('valor_pago').value) || 0,
         data_emissao: document.getElementById('data_emissao').value,
         data_vencimento: document.getElementById('data_vencimento').value,
         data_pagamento: document.getElementById('data_pagamento').value || null,
@@ -821,6 +878,7 @@ window.handleSubmit = async function(event) {
         if (editId) {
             const index = contas.findIndex(c => c.id === editId);
             if (index !== -1) contas[index] = mappedData;
+            showMessage(`Conta NF ${formData.numero_nf} atualizada`, 'success');
         } else {
             contas.push(mappedData);
             showMessage(`NF ${formData.numero_nf} registrada`, 'success');
@@ -834,6 +892,7 @@ window.handleSubmit = async function(event) {
 
     } catch (error) {
         console.error('Erro:', error);
+        showMessage('Erro ao salvar conta', 'error');
     }
 };
 
@@ -842,11 +901,7 @@ window.handleSubmit = async function(event) {
 // ============================================
 window.editConta = function(id) {
     const conta = contas.find(c => c.id === id);
-
-    if (!conta) {
-        return;
-    }
-
+    if (!conta) return;
     showFormModal(id);
 };
 
@@ -900,14 +955,11 @@ window.deleteConta = async function(id) {
 };
 
 // ============================================
-// VISUALIZAÇÃO
+// VISUALIZAÇÃO (sem botão Ver, por clique na linha)
 // ============================================
 window.viewConta = function(id) {
     const conta = contas.find(c => c.id === id);
-
-    if (!conta) {
-        return;
-    }
+    if (!conta) return;
 
     const tipoNfLabel = {
         'ENVIO': 'Envio',
@@ -925,6 +977,12 @@ window.viewConta = function(id) {
             <p class="observacao-texto">${obs.texto}</p>
         </div>
     `).join('');
+
+    // Status formatado igual ao da tabela
+    let statusDisplay = conta.status;
+    if (conta.tipo_nf && conta.tipo_nf !== 'ENVIO') {
+        statusDisplay = conta.tipo_nf.replace(/_/g, ' ');
+    }
 
     const modalHTML = `
         <div class="modal-overlay" id="viewModal" style="display: flex;">
@@ -949,14 +1007,15 @@ window.viewConta = function(id) {
                             <p><strong>Vendedor:</strong> ${conta.vendedor}</p>
                             <p><strong>Banco:</strong> ${conta.banco}</p>
                             <p><strong>Tipo de NF:</strong> ${tipoNfLabel[conta.tipo_nf] || conta.tipo_nf}</p>
-                            <p><strong>Status:</strong> <span class="badge status-${conta.status.toLowerCase().replace(' ', '-')}">${conta.status}</span></p>
+                            <p><strong>Status:</strong> <span class="badge status-${conta.status.toLowerCase().replace(' ', '-')}">${statusDisplay}</span></p>
                         </div>
                     </div>
 
                     <div class="tab-content" id="view-tab-valores">
                         <div class="info-section">
                             <h4>Valores e Datas</h4>
-                            <p><strong>Valor:</strong> ${formatCurrency(conta.valor)}</p>
+                            <p><strong>Valor da NF:</strong> ${formatCurrency(conta.valor)}</p>
+                            <p><strong>Valor Pago:</strong> ${formatCurrency(conta.valor_pago || 0)}</p>
                             <p><strong>Data de Emissão:</strong> ${formatDate(conta.data_emissao)}</p>
                             <p><strong>Data de Vencimento:</strong> ${formatDate(conta.data_vencimento)}</p>
                             ${conta.data_pagamento ? `<p><strong>Data de Pagamento:</strong> ${formatDate(conta.data_pagamento)}</p>` : '<p><strong>Data de Pagamento:</strong> Não pago</p>'}
@@ -1100,7 +1159,7 @@ function filterContas() {
 }
 
 // ============================================
-// RENDERIZAÇÃO
+// RENDERIZAÇÃO DA TABELA (com nova coluna valor_pago e sem coluna valor)
 // ============================================
 function renderContas(contasToRender) {
     const container = document.getElementById('contasContainer');
@@ -1122,8 +1181,8 @@ function renderContas(contasToRender) {
                         <th>Órgão</th>
                         <th>Vendedor</th>
                         <th>Banco</th>
-                        <th>Valor</th>
                         <th>Pagamento</th>
+                        <th>Valor Pago</th>
                         <th>Status</th>
                         <th style="text-align: center; min-width: 260px;">Ações</th>
                     </tr>
@@ -1135,8 +1194,9 @@ function renderContas(contasToRender) {
                         const isEnvio = !c.tipo_nf || c.tipo_nf === 'ENVIO';
                         const isPago = c.status === 'PAGO';
                         const rowClass = isPago ? 'row-pago' : '';
+                        const statusDisplay = isEspecial ? c.tipo_nf.replace(/_/g, ' ') : c.status;
                         return `
-                        <tr class="${rowClass}">
+                        <tr class="${rowClass}" data-id="${c.id}" style="cursor:pointer;">
                             <td style="text-align: center;">
                                 ${isEnvio ? `
                                     <button class="check-btn ${isPago ? 'checked' : ''}" 
@@ -1150,15 +1210,14 @@ function renderContas(contasToRender) {
                             <td>${c.orgao}</td>
                             <td>${c.vendedor}</td>
                             <td>${c.banco}</td>
-                            <td><strong>${formatCurrency(c.valor)}</strong></td>
                             <td>${c.data_pagamento ? formatDate(c.data_pagamento) : '-'}</td>
+                            <td><strong>${formatCurrency(c.valor_pago || 0)}</strong></td>
                             <td>
                                 <span class="badge status-${isEspecial ? 'especial' : statusClass}">
-                                    ${isEspecial ? c.tipo_nf.replace(/_/g, ' ') : c.status}
+                                    ${statusDisplay}
                                 </span>
                             </td>
                             <td class="actions-cell" style="text-align: center;">
-                                <button onclick="viewConta('${c.id}')" class="action-btn view">Ver</button>
                                 <button onclick="editConta('${c.id}')" class="action-btn edit">Editar</button>
                                 <button onclick="deleteConta('${c.id}')" class="action-btn delete">Excluir</button>
                             </td>
@@ -1170,10 +1229,22 @@ function renderContas(contasToRender) {
     `;
 
     container.innerHTML = table;
+
+    // Adiciona evento de clique nas linhas para abrir o modal de visualização
+    document.querySelectorAll('#contasContainer tbody tr').forEach(tr => {
+        tr.addEventListener('click', function(e) {
+            // Se o clique foi em um botão, não abre o modal
+            if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
+                return;
+            }
+            const id = this.dataset.id;
+            if (id) viewConta(id);
+        });
+    });
 }
 
 // ============================================
-// TOGGLE STATUS PAGO
+// TOGGLE STATUS PAGO (agora também atualiza valor_pago)
 // ============================================
 window.togglePago = async function(id) {
     const conta = contas.find(c => c.id === id);
@@ -1181,18 +1252,28 @@ window.togglePago = async function(id) {
 
     const novoStatus = conta.status === 'PAGO' ? 'A RECEBER' : 'PAGO';
     const dataPagamento = novoStatus === 'PAGO' ? new Date().toISOString().split('T')[0] : null;
+    
+    // Se for marcar como pago, sugere preencher o valor_pago com o valor total (se estiver vazio)
+    let novoValorPago = conta.valor_pago;
+    if (novoStatus === 'PAGO' && (conta.valor_pago === 0 || conta.valor_pago === null)) {
+        // Poderia abrir um prompt? Mas para simplificar, definimos como o valor total
+        // O usuário pode ajustar manualmente depois
+        novoValorPago = conta.valor;
+    }
 
     const statusAnterior = conta.status;
     const dataPagamentoAnterior = conta.data_pagamento;
+    const valorPagoAnterior = conta.valor_pago;
 
     conta.status = novoStatus;
     conta.data_pagamento = dataPagamento;
+    conta.valor_pago = novoValorPago;
 
     updateDashboard();
     filterContas();
 
     if (novoStatus === 'PAGO') {
-        showMessage('Pagamento confirmado', 'success');
+        showMessage('Pagamento confirmado. Ajuste o valor pago se necessário.', 'success');
     } else {
         showMessage('Confirmação de pagamento revogada', 'error');
     }
@@ -1221,8 +1302,10 @@ window.togglePago = async function(id) {
         } catch (error) {
             conta.status = statusAnterior;
             conta.data_pagamento = dataPagamentoAnterior;
+            conta.valor_pago = valorPagoAnterior;
             updateDashboard();
             filterContas();
+            showMessage('Erro ao atualizar status', 'error');
         }
     }
 };
