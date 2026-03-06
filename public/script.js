@@ -402,6 +402,26 @@ function updateDashboard() {
     }
 }
 
+function verificarContasVencidas() {
+    const jaExibiu = sessionStorage.getItem(NOTIFICATION_KEY);
+    if (jaExibiu) return;
+
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+    const contasVencidas = contas.filter(c => {
+        if (c.tipo_nf && c.tipo_nf !== 'ENVIO') return false;
+        if (c.status === 'PAGO') return false;
+        const vencimento = new Date(c.data_vencimento + 'T00:00:00');
+        return vencimento < hoje;
+    });
+
+    if (contasVencidas.length > 0) {
+        mostrarNotificacaoVencidos(contasVencidas);
+        sessionStorage.setItem(NOTIFICATION_KEY, 'true');
+    }
+}
+
 function mostrarNotificacaoVencidos(contas) {
     const totalVencido = contas.reduce((sum, c) => sum + c.valor, 0);
 
