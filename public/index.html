@@ -126,22 +126,23 @@
                             </svg>
                         </div>
                         
-                        <!-- Substitua o bloco month-navigation-inline por este: -->
-<div class="month-navigation-inline">
-    <button onclick="changeMonth(-1)" class="month-nav-arrow" title="Mês anterior">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="15 18 9 12 15 6"></polyline>
-        </svg>
-    </button>
-    <div class="month-display-inline">
-        <span id="currentMonth">Carregando...</span>
-    </div>
-    <button onclick="changeMonth(1)" class="month-nav-arrow" title="Próximo mês">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="9 18 15 12 9 6"></polyline>
-        </svg>
-    </button>
-</div>
+                        <!-- Navegação de meses (sem botão Todos) -->
+                        <div class="month-navigation-inline">
+                            <button onclick="changeMonth(-1)" class="month-nav-arrow" title="Mês anterior">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="15 18 9 12 15 6"></polyline>
+                                </svg>
+                            </button>
+                            <div class="month-display-inline">
+                                <span id="currentMonth">Carregando...</span>
+                            </div>
+                            <button onclick="changeMonth(1)" class="month-nav-arrow" title="Próximo mês">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
 
                     <button class="calendar-btn" onclick="toggleCalendar()" title="Selecionar mês">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
