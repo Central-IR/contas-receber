@@ -11,7 +11,7 @@ let lastDataHash = '';
 let sessionToken = null;
 let currentMonth = new Date().getMonth();
 let currentYear = new Date().getFullYear();
-let showAllMonths = false; // Controle para exibir todos os meses
+let showAllMonths = false; // Controle para exibir todos os meses (via calendário)
 let currentTabIndex = 0; // Para navegação entre abas
 const tabs = ['tab-basico', 'tab-valores', 'tab-observacoes']; // IDs das abas no formulário
 
@@ -39,7 +39,7 @@ function formatCurrency(valor) {
 }
 
 // ============================================
-// NAVEGAÇÃO POR MESES (com opção "Todos os Meses")
+// NAVEGAÇÃO POR MESES (com opção "Todos os Meses" via calendário)
 // ============================================
 function updateMonthDisplay() {
     const display = document.getElementById('currentMonth');
@@ -49,11 +49,6 @@ function updateMonthDisplay() {
         } else {
             display.textContent = `${meses[currentMonth]} ${currentYear}`;
         }
-    }
-    // Atualiza a classe ativa do botão "Todos"
-    const btnAll = document.querySelector('.month-nav-all');
-    if (btnAll) {
-        btnAll.classList.toggle('active', showAllMonths);
     }
     updateDashboard();
     filterContas();
@@ -73,7 +68,7 @@ window.changeMonth = function(direction) {
     updateMonthDisplay();
 };
 
-// Alterna o modo "Todos os Meses"
+// Função chamada pelo calendário para ativar/desativar "Todos os Meses"
 window.toggleAllMonths = function() {
     showAllMonths = !showAllMonths;
     updateMonthDisplay();
