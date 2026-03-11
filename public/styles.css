@@ -772,7 +772,6 @@ tbody tr.row-pago:hover {
     border: 1px solid rgba(34, 197, 94, 0.2);
 }
 
-/* O badge .status-vencido não é mais utilizado, mas mantido por precaução */
 .badge.status-vencido {
     background: rgba(239, 68, 68, 0.1);
     color: #DC2626;
