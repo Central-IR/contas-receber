@@ -379,6 +379,9 @@ h2 {
 }
 
 .month-display-inline {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
     padding: 0 0.5rem;
     font-size: 0.85rem;
     font-weight: 600;
@@ -386,52 +389,36 @@ h2 {
     white-space: nowrap;
 }
 
-/* Botão "Todos os Meses" */
+/* Botão "Todos" integrado */
 .month-nav-all {
-    background: var(--input-bg);
-    border: 1px solid var(--border-color);
-    color: var(--text-primary);
-    padding: 0.35rem 0.75rem;
-    border-radius: 6px;
-    font-size: 0.8rem;
-    font-weight: 600;
+    background: var(--primary);
+    border: 1px solid var(--primary);
+    color: white;
+    padding: 0.2rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 700;
     cursor: pointer;
     transition: all 0.2s ease;
-    margin-left: 0.25rem;
-    height: 38px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    height: 24px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    box-shadow: 0 2px 4px rgba(204, 112, 0, 0.3);
 }
 
 .month-nav-all:hover {
-    background: var(--primary);
-    color: white;
-    border-color: var(--primary);
+    background: #b35f00;
+    border-color: #b35f00;
+    transform: scale(1.05);
 }
 
 .month-nav-all.active {
-    background: var(--primary);
-    color: white;
-    border-color: var(--primary);
-}
-
-.search-btn {
-    background: transparent;
-    border: none;
-    color: var(--text-secondary);
-    cursor: pointer;
-    padding: 0.5rem;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
-}
-
-.search-btn:hover {
-    background: var(--input-bg);
-    color: var(--text-primary);
+    background: var(--success-color);
+    border-color: var(--success-color);
+    box-shadow: 0 2px 4px rgba(34, 197, 94, 0.3);
 }
 
 /* CALENDAR BUTTON */
@@ -548,6 +535,20 @@ h2 {
     background: var(--primary);
     color: white;
     border-color: var(--primary);
+}
+
+/* Estilo para o botão "Todos" no calendário */
+.calendar-month.todos {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+    font-weight: 700;
+}
+
+.calendar-month.todos:hover {
+    background: #b35f00;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(204, 112, 0, 0.3);
 }
 
 .dashboard-grid {
