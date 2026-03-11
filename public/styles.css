@@ -379,9 +379,6 @@ h2 {
 }
 
 .month-display-inline {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
     padding: 0 0.5rem;
     font-size: 0.85rem;
     font-weight: 600;
@@ -389,28 +386,6 @@ h2 {
     white-space: nowrap;
 }
 
-.month-nav-all {
-    background: transparent;
-    border: none;
-    color: var(--text-secondary);
-    padding: 0.2rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.85rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: color 0.2s ease;
-    margin-left: 0.25rem;
-}
-
-.month-nav-all:hover {
-    color: var(--primary);
-    background: transparent;
-}
-
-.month-nav-all.active {
-    color: var(--primary);
-    font-weight: 600;
-}
 /* CALENDAR BUTTON */
 .calendar-btn {
     background: transparent;
@@ -527,22 +502,18 @@ h2 {
     border-color: var(--primary);
 }
 
+/* Estilo para o botão "Todos" no calendário */
 .calendar-month.todos {
-    /* mesmo estilo dos meses */
-    background: var(--input-bg);
-    border: 1px solid var(--border-color);
-    color: var(--text-primary);
-}
-
-.calendar-month.todos:hover {
     background: var(--primary);
     color: white;
     border-color: var(--primary);
+    font-weight: 700;
 }
 
-.calendar-month.todos.current {
-    background: var(--primary);
-    color: white;
+.calendar-month.todos:hover {
+    background: #b35f00;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(204, 112, 0, 0.3);
 }
 
 .dashboard-grid {
