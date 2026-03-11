@@ -36,9 +36,15 @@ function renderCalendarMonths() {
     
     container.innerHTML = '';
     
+    // Verifica se o modo "Todos os Meses" está ativo
+    const isAllMonthsActive = typeof showAllMonths !== 'undefined' && showAllMonths;
+    
     // Adiciona a opção "Todos" antes dos meses
     const todosDiv = document.createElement('div');
     todosDiv.className = 'calendar-month todos';
+    if (isAllMonthsActive) {
+        todosDiv.classList.add('current'); // destaca se estiver ativo
+    }
     todosDiv.textContent = 'Todos';
     todosDiv.onclick = () => selectAllMonths();
     container.appendChild(todosDiv);
@@ -49,8 +55,8 @@ function renderCalendarMonths() {
         monthDiv.className = 'calendar-month';
         monthDiv.textContent = mes;
         
-        // Marcar mês atual se for o ano corrente
-        if (calendarYear === new Date().getFullYear() && index === new Date().getMonth()) {
+        // Marcar mês atual se for o ano corrente E não estiver no modo "Todos"
+        if (!isAllMonthsActive && calendarYear === new Date().getFullYear() && index === new Date().getMonth()) {
             monthDiv.classList.add('current');
         }
         
@@ -63,10 +69,12 @@ function renderCalendarMonths() {
 
 // Função para selecionar um mês
 function selectMonth(monthIndex) {
+    // Verifica se as variáveis globais existem
     if (typeof currentMonth !== 'undefined' && typeof currentYear !== 'undefined') {
+        // Desativa o modo "Todos"
         if (typeof showAllMonths !== 'undefined' && showAllMonths) {
             if (typeof toggleAllMonths === 'function') {
-                toggleAllMonths(); // Desativa o modo "Todos"
+                toggleAllMonths(); // Isso desativará o modo
             } else {
                 showAllMonths = false;
             }
@@ -75,26 +83,41 @@ function selectMonth(monthIndex) {
         currentMonth = monthIndex;
         currentYear = calendarYear;
         
-        if (typeof updateMonthDisplay === 'function') updateMonthDisplay();
-        if (typeof filterContas === 'function') filterContas();
+        // Atualiza a interface se as funções existirem
+        if (typeof updateMonthDisplay === 'function') {
+            updateMonthDisplay();
+        }
+        if (typeof filterContas === 'function') {
+            filterContas();
+        }
     }
+    
+    // Fecha o modal
     toggleCalendar();
 }
 
 // Função para selecionar "Todos os Meses"
 function selectAllMonths() {
     if (typeof showAllMonths !== 'undefined') {
+        // Ativa o modo "Todos" se não estiver ativo
         if (!showAllMonths) {
             if (typeof toggleAllMonths === 'function') {
-                toggleAllMonths(); // Ativa o modo "Todos"
+                toggleAllMonths(); // Isso ativará o modo
             } else {
                 showAllMonths = true;
             }
         }
         
-        if (typeof updateMonthDisplay === 'function') updateMonthDisplay();
-        if (typeof filterContas === 'function') filterContas();
+        // Atualiza a interface
+        if (typeof updateMonthDisplay === 'function') {
+            updateMonthDisplay();
+        }
+        if (typeof filterContas === 'function') {
+            filterContas();
+        }
     }
+    
+    // Fecha o modal
     toggleCalendar();
 }
 
