@@ -36,14 +36,14 @@ function renderCalendarMonths() {
     
     container.innerHTML = '';
     
-    // Verifica se o modo "Todos os Meses" está ativo
-    const isAllMonthsActive = typeof showAllMonths !== 'undefined' && showAllMonths;
+    // Verifica se o modo "Todos os Meses" está ativo para o ano atual
+    const isAllMonthsActive = typeof showAllMonths !== 'undefined' && showAllMonths && currentYear === calendarYear;
     
     // Adiciona a opção "Todos" antes dos meses
     const todosDiv = document.createElement('div');
     todosDiv.className = 'calendar-month todos';
     if (isAllMonthsActive) {
-        todosDiv.classList.add('current'); // destaca se estiver ativo
+        todosDiv.classList.add('current'); // destaca se estiver ativo para este ano
     }
     todosDiv.textContent = 'Todos';
     todosDiv.onclick = () => selectAllMonths();
@@ -55,7 +55,7 @@ function renderCalendarMonths() {
         monthDiv.className = 'calendar-month';
         monthDiv.textContent = mes;
         
-        // Marcar mês atual se for o ano corrente E não estiver no modo "Todos"
+        // Marcar mês atual se for o ano corrente e o mês for o atual e não estiver no modo "Todos"
         if (!isAllMonthsActive && calendarYear === new Date().getFullYear() && index === new Date().getMonth()) {
             monthDiv.classList.add('current');
         }
@@ -98,22 +98,22 @@ function selectMonth(monthIndex) {
 
 // Função para selecionar "Todos os Meses"
 function selectAllMonths() {
-    if (typeof showAllMonths !== 'undefined') {
-        // Ativa o modo "Todos" se não estiver ativo
-        if (!showAllMonths) {
-            if (typeof toggleAllMonths === 'function') {
-                toggleAllMonths(); // Isso ativará o modo
-            } else {
-                showAllMonths = true;
+    if (typeof showAllMonths !== 'undefined' && typeof currentYear !== 'undefined') {
+        // Ativa o modo "Todos" para o ano selecionado no calendário
+        if (!showAllMonths || currentYear !== calendarYear) {
+            // Se não está ativo ou está ativo para outro ano, ativamos para este ano
+            showAllMonths = true;
+            currentYear = calendarYear;
+            // Não alteramos currentMonth, mas podemos definir como null ou ignorado
+            if (typeof updateMonthDisplay === 'function') {
+                updateMonthDisplay();
             }
-        }
-        
-        // Atualiza a interface
-        if (typeof updateMonthDisplay === 'function') {
-            updateMonthDisplay();
-        }
-        if (typeof filterContas === 'function') {
-            filterContas();
+            if (typeof filterContas === 'function') {
+                filterContas();
+            }
+        } else {
+            // Se já está ativo para este ano, podemos desativar? Ou manter? Por enquanto, mantém ativo.
+            // Se quiser toggle, poderia fazer showAllMonths = false, mas acho melhor manter.
         }
     }
     
