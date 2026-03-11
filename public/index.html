@@ -120,7 +120,7 @@
                                 <option value="">Todos os Status</option>
                                 <option value="A RECEBER">A Receber</option>
                                 <option value="PAGO">Pago</option>
-                                <option value="VENCIDO">Vencido</option>
+                                <!-- Opção VENCIDO removida conforme solicitado -->
                             </select>
                             <svg class="dropdown-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="6 9 12 15 18 9"></polyline>
@@ -139,6 +139,9 @@
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <polyline points="9 18 15 12 9 6"></polyline>
                                 </svg>
+                            </button>
+                            <button onclick="toggleAllMonths()" class="month-nav-all" title="Todos os meses">
+                                Todos
                             </button>
                         </div>
                     </div>
