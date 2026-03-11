@@ -11,7 +11,7 @@ let lastDataHash = '';
 let sessionToken = null;
 let currentMonth = new Date().getMonth();
 let currentYear = new Date().getFullYear();
-let showAllMonths = false; // Controle para exibir todos os meses (via calendário)
+let showAllMonths = false; // Controle para exibir todos os meses do ano corrente
 let currentTabIndex = 0; // Para navegação entre abas
 const tabs = ['tab-basico', 'tab-valores', 'tab-observacoes']; // IDs das abas no formulário
 
@@ -39,13 +39,13 @@ function formatCurrency(valor) {
 }
 
 // ============================================
-// NAVEGAÇÃO POR MESES (com opção "Todos os Meses" via calendário)
+// NAVEGAÇÃO POR MESES (com opção "Todos os Meses")
 // ============================================
 function updateMonthDisplay() {
     const display = document.getElementById('currentMonth');
     if (display) {
         if (showAllMonths) {
-            display.textContent = 'Todos os Meses';
+            display.textContent = `Todos os meses de ${currentYear}`;
         } else {
             display.textContent = `${meses[currentMonth]} ${currentYear}`;
         }
@@ -68,8 +68,10 @@ window.changeMonth = function(direction) {
     updateMonthDisplay();
 };
 
-// Função chamada pelo calendário para ativar/desativar "Todos os Meses"
+// Alterna o modo "Todos os Meses" (chamado pelo calendário)
 window.toggleAllMonths = function() {
+    // Esta função é chamada pelo calendar.js para ativar/desativar o modo
+    // Mas como o calendar.js já gerencia, podemos apenas alternar
     showAllMonths = !showAllMonths;
     updateMonthDisplay();
 };
@@ -345,26 +347,33 @@ function calcularStatus(conta) {
 // DASHBOARD (com valor_pago e quantidade vencida)
 // ============================================
 function updateDashboard() {
-    const contasMesAtual = contas.filter(c => {
-        if (showAllMonths) return true; // Se todos os meses, considera todas
-        const data = new Date(c.data_emissao + 'T00:00:00');
-        return data.getMonth() === currentMonth && data.getFullYear() === currentYear;
+    // Para o dashboard, consideramos as contas do período selecionado (mês ou ano)
+    const contasPeriodo = contas.filter(c => {
+        if (showAllMonths) {
+            // Se modo "Todos", filtra por ano
+            const data = new Date(c.data_emissao + 'T00:00:00');
+            return data.getFullYear() === currentYear;
+        } else {
+            // Senão, filtra por mês e ano
+            const data = new Date(c.data_emissao + 'T00:00:00');
+            return data.getMonth() === currentMonth && data.getFullYear() === currentYear;
+        }
     });
 
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
 
     // Total faturado (soma dos valores das NFs de envio)
-    const totalFaturado = contasMesAtual
+    const totalFaturado = contasPeriodo
         .filter(c => !c.tipo_nf || c.tipo_nf === 'ENVIO')
         .reduce((sum, c) => sum + c.valor, 0);
 
     // Total pago (soma dos valores pagos, independente do status)
-    const totalPago = contasMesAtual
+    const totalPago = contasPeriodo
         .filter(c => !c.tipo_nf || c.tipo_nf === 'ENVIO')
         .reduce((sum, c) => sum + (c.valor_pago || 0), 0);
 
-    // QUANTIDADE de contas vencidas (considera todas as contas, independente do filtro de mês)
+    // QUANTIDADE de contas vencidas (considera todas as contas, independente do filtro)
     const todasContasEnvio = contas.filter(c => !c.tipo_nf || c.tipo_nf === 'ENVIO');
 
     const quantidadeVencidas = todasContasEnvio
@@ -1150,8 +1159,15 @@ function filterContas() {
 
     let filtered = [...contas];
 
-    // Filtro por mês (ou todos)
-    if (!showAllMonths) {
+    // Filtro por período (mês/ano ou ano inteiro)
+    if (showAllMonths) {
+        // Modo "Todos": filtrar por ano
+        filtered = filtered.filter(c => {
+            const data = new Date(c.data_emissao + 'T00:00:00');
+            return data.getFullYear() === currentYear;
+        });
+    } else {
+        // Modo normal: filtrar por mês e ano
         filtered = filtered.filter(c => {
             const data = new Date(c.data_emissao + 'T00:00:00');
             return data.getMonth() === currentMonth && data.getFullYear() === currentYear;
@@ -1181,14 +1197,14 @@ function filterContas() {
 
     // Ordenação
     if (showAllMonths) {
-        // Todos os meses: ordenar por data de emissão crescente (mais antiga primeiro)
+        // Todos os meses do ano: ordenar por data de emissão crescente
         filtered.sort((a, b) => {
             const dateA = new Date(a.data_emissao + 'T00:00:00');
             const dateB = new Date(b.data_emissao + 'T00:00:00');
             return dateA - dateB;
         });
     } else {
-        // Mês específico: ordenar por número NF decrescente (como antes)
+        // Mês específico: ordenar por número NF decrescente
         filtered.sort((a, b) => {
             const numA = parseInt(a.numero_nf.replace(/\D/g, '')) || 0;
             const numB = parseInt(b.numero_nf.replace(/\D/g, '')) || 0;
