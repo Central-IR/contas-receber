@@ -502,12 +502,19 @@ h2 {
     border-color: var(--primary);
 }
 
-/* Estilo para o botão "Todos" no calendário - neutro por padrão */
+/* Estilo para o botão "Todos" no calendário */
 .calendar-month.todos {
     background: var(--input-bg);
     color: var(--text-primary);
     border-color: var(--border-color);
     font-weight: 600;
+}
+
+.calendar-month.todos.current {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+    font-weight: 700;
 }
 
 .calendar-month.todos:hover {
@@ -516,13 +523,6 @@ h2 {
     border-color: var(--primary);
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(204, 112, 0, 0.3);
-}
-
-/* Quando o modo "Todos" estiver ativo, o botão fica destacado */
-.calendar-month.todos.current {
-    background: var(--primary);
-    color: white;
-    border-color: var(--primary);
 }
 
 .dashboard-grid {
