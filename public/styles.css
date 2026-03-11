@@ -389,38 +389,28 @@ h2 {
     white-space: nowrap;
 }
 
-/* Botão "Todos" integrado */
 .month-nav-all {
-    background: var(--primary);
-    border: 1px solid var(--primary);
-    color: white;
-    padding: 0.2rem 0.75rem;
-    border-radius: 12px;
-    font-size: 0.7rem;
-    font-weight: 700;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s ease;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    height: 24px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 2px 4px rgba(204, 112, 0, 0.3);
+    transition: color 0.2s ease;
+    margin-left: 0.25rem;
 }
 
 .month-nav-all:hover {
-    background: #b35f00;
-    border-color: #b35f00;
-    transform: scale(1.05);
+    color: var(--primary);
+    background: transparent;
 }
 
 .month-nav-all.active {
-    background: var(--success-color);
-    border-color: var(--success-color);
-    box-shadow: 0 2px 4px rgba(34, 197, 94, 0.3);
+    color: var(--primary);
+    font-weight: 600;
 }
-
 /* CALENDAR BUTTON */
 .calendar-btn {
     background: transparent;
