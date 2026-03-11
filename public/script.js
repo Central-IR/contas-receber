@@ -11,7 +11,7 @@ let lastDataHash = '';
 let sessionToken = null;
 let currentMonth = new Date().getMonth();
 let currentYear = new Date().getFullYear();
-let showAllMonths = false; // NOVO: controle para exibir todos os meses
+let showAllMonths = false; // Controle para exibir todos os meses
 let currentTabIndex = 0; // Para navegação entre abas
 const tabs = ['tab-basico', 'tab-valores', 'tab-observacoes']; // IDs das abas no formulário
 
@@ -73,7 +73,7 @@ window.changeMonth = function(direction) {
     updateMonthDisplay();
 };
 
-// NOVO: alterna para "Todos os Meses"
+// Alterna o modo "Todos os Meses"
 window.toggleAllMonths = function() {
     showAllMonths = !showAllMonths;
     updateMonthDisplay();
@@ -572,7 +572,7 @@ window.closeVencidosModal = function() {
 };
 
 // ============================================
-// FORMULÁRIO (sem alterações, apenas observações)
+// FORMULÁRIO (com observações)
 // ============================================
 window.toggleForm = function() {
     showFormModal(null);
