@@ -11,6 +11,7 @@ let lastDataHash = '';
 let sessionToken = null;
 let currentMonth = new Date().getMonth();
 let currentYear = new Date().getFullYear();
+let showAllMonths = false; // NOVO: controle para exibir todos os meses
 let currentTabIndex = 0; // Para navegação entre abas
 const tabs = ['tab-basico', 'tab-valores', 'tab-observacoes']; // IDs das abas no formulário
 
@@ -38,18 +39,29 @@ function formatCurrency(valor) {
 }
 
 // ============================================
-// NAVEGAÇÃO POR MESES
+// NAVEGAÇÃO POR MESES (com opção "Todos os Meses")
 // ============================================
 function updateMonthDisplay() {
     const display = document.getElementById('currentMonth');
     if (display) {
-        display.textContent = `${meses[currentMonth]} ${currentYear}`;
+        if (showAllMonths) {
+            display.textContent = 'Todos os Meses';
+        } else {
+            display.textContent = `${meses[currentMonth]} ${currentYear}`;
+        }
+    }
+    // Atualiza a classe ativa do botão "Todos"
+    const btnAll = document.querySelector('.month-nav-all');
+    if (btnAll) {
+        btnAll.classList.toggle('active', showAllMonths);
     }
     updateDashboard();
     filterContas();
 }
 
 window.changeMonth = function(direction) {
+    // Ao navegar pelos meses, desativa o modo "Todos os Meses"
+    showAllMonths = false;
     currentMonth = currentMonth + direction;
     if (currentMonth < 0) {
         currentMonth = 11;
@@ -58,6 +70,12 @@ window.changeMonth = function(direction) {
         currentMonth = 0;
         currentYear++;
     }
+    updateMonthDisplay();
+};
+
+// NOVO: alterna para "Todos os Meses"
+window.toggleAllMonths = function() {
+    showAllMonths = !showAllMonths;
     updateMonthDisplay();
 };
 
@@ -264,7 +282,7 @@ function mapearConta(conta) {
         vendedor: conta.vendedor || '',
         banco: conta.banco || '',
         valor: parseFloat(conta.valor) || 0,
-        valor_pago: parseFloat(conta.valor_pago) || 0, // NOVO CAMPO
+        valor_pago: parseFloat(conta.valor_pago) || 0,
         data_emissao: conta.data_emissao || '',
         data_vencimento: conta.data_vencimento || '',
         data_pagamento: conta.data_pagamento || null,
@@ -313,25 +331,18 @@ function startPolling() {
 }
 
 // ============================================
-// CÁLCULO AUTOMÁTICO DE STATUS
+// CÁLCULO AUTOMÁTICO DE STATUS (sem VENCIDO)
 // ============================================
 function calcularStatus(conta) {
     if (conta.tipo_nf && conta.tipo_nf !== 'ENVIO') {
-        return 'ESPECIAL';
+        return 'ESPECIAL'; // Mantém para tipos especiais
     }
 
     if (conta.data_pagamento) {
         return 'PAGO';
     }
 
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    const vencimento = new Date(conta.data_vencimento + 'T00:00:00');
-
-    if (vencimento < hoje) {
-        return 'VENCIDO';
-    }
-
+    // Não retorna mais VENCIDO; todas as não pagas são A RECEBER
     return 'A RECEBER';
 }
 
@@ -340,6 +351,7 @@ function calcularStatus(conta) {
 // ============================================
 function updateDashboard() {
     const contasMesAtual = contas.filter(c => {
+        if (showAllMonths) return true; // Se todos os meses, considera todas
         const data = new Date(c.data_emissao + 'T00:00:00');
         return data.getMonth() === currentMonth && data.getFullYear() === currentYear;
     });
@@ -357,7 +369,7 @@ function updateDashboard() {
         .filter(c => !c.tipo_nf || c.tipo_nf === 'ENVIO')
         .reduce((sum, c) => sum + (c.valor_pago || 0), 0);
 
-    // QUANTIDADE de contas vencidas (considera todas as contas, não só do mês)
+    // QUANTIDADE de contas vencidas (considera todas as contas, independente do filtro de mês)
     const todasContasEnvio = contas.filter(c => !c.tipo_nf || c.tipo_nf === 'ENVIO');
 
     const quantidadeVencidas = todasContasEnvio
@@ -366,15 +378,6 @@ function updateDashboard() {
             const dataVencimento = new Date(c.data_vencimento + 'T00:00:00');
             return dataVencimento < hoje;
         }).length;
-
-    // Total vencido (valor) – usado apenas para badge/alerta, não exibido no card principal
-    const totalVencido = todasContasEnvio
-        .filter(c => {
-            if (c.status === 'PAGO') return false;
-            const dataVencimento = new Date(c.data_vencimento + 'T00:00:00');
-            return dataVencimento < hoje;
-        })
-        .reduce((sum, c) => sum + c.valor, 0);
 
     const totalReceber = totalFaturado - totalPago;
 
@@ -385,7 +388,7 @@ function updateDashboard() {
 
     if (statFaturado) statFaturado.textContent = formatCurrency(totalFaturado);
     if (statPago) statPago.textContent = formatCurrency(totalPago);
-    if (statVencido) statVencido.textContent = quantidadeVencidas; // ← APENAS O NÚMERO
+    if (statVencido) statVencido.textContent = quantidadeVencidas;
     if (statReceber) statReceber.textContent = formatCurrency(totalReceber);
 
     const badgeVencido = document.getElementById('pulseBadgeVencido');
@@ -474,23 +477,17 @@ window.fecharNotificacaoVencidos = function() {
 };
 
 // ============================================
-// MODAL DE CONTAS VENCIDAS
+// MODAL DE CONTAS VENCIDAS COM PAGINAÇÃO
 // ============================================
-window.showVencidosModal = function() {
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
+let vencidosPage = 1;
+const VENCIDOS_PER_PAGE = 5;
+let vencidosData = [];
 
-    const contasVencidas = contas.filter(c => {
-        if (c.tipo_nf && c.tipo_nf !== 'ENVIO') return false;
-        if (c.status === 'PAGO') return false;
-        const vencimento = new Date(c.data_vencimento + 'T00:00:00');
-        return vencimento < hoje;
-    });
-
-    if (contasVencidas.length === 0) {
-        showMessage('Não há contas vencidas no momento!', 'error');
-        return;
-    }
+function renderVencidosTable() {
+    const start = (vencidosPage - 1) * VENCIDOS_PER_PAGE;
+    const end = start + VENCIDOS_PER_PAGE;
+    const pageContas = vencidosData.slice(start, end);
+    const totalPages = Math.ceil(vencidosData.length / VENCIDOS_PER_PAGE);
 
     const tabelaHTML = `
         <div style="overflow-x: auto; margin-top: 1rem;">
@@ -504,7 +501,7 @@ window.showVencidosModal = function() {
                     </tr>
                 </thead>
                 <tbody>
-                    ${contasVencidas.map(c => `
+                    ${pageContas.map(c => `
                         <tr>
                             <td><strong>${c.numero_nf}</strong></td>
                             <td>${c.orgao}</td>
@@ -515,20 +512,54 @@ window.showVencidosModal = function() {
                 </tbody>
             </table>
         </div>
-    `;
-
-    const bodyHTML = `
-        <h3 style="color: #EF4444; margin: 0 0 1.5rem 0;">
-            Contas Vencidas (${contasVencidas.length})
-        </h3>
-        ${tabelaHTML}
+        <div style="display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 1.5rem;">
+            <button onclick="changeVencidosPage(-1)" ${vencidosPage === 1 ? 'disabled' : ''} style="padding: 0.5rem 1rem;">Anterior</button>
+            <span>Página ${vencidosPage} de ${totalPages}</span>
+            <button onclick="changeVencidosPage(1)" ${vencidosPage === totalPages ? 'disabled' : ''} style="padding: 0.5rem 1rem;">Próximo</button>
+        </div>
     `;
 
     const modalBody = document.getElementById('vencidosModalBody');
+    if (modalBody) {
+        modalBody.innerHTML = `
+            <h3 style="color: #EF4444; margin: 0 0 1.5rem 0;">
+                Contas Vencidas (${vencidosData.length})
+            </h3>
+            ${tabelaHTML}
+        `;
+    }
+}
+
+window.changeVencidosPage = function(delta) {
+    const totalPages = Math.ceil(vencidosData.length / VENCIDOS_PER_PAGE);
+    const newPage = vencidosPage + delta;
+    if (newPage >= 1 && newPage <= totalPages) {
+        vencidosPage = newPage;
+        renderVencidosTable();
+    }
+};
+
+window.showVencidosModal = function() {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+    vencidosData = contas.filter(c => {
+        if (c.tipo_nf && c.tipo_nf !== 'ENVIO') return false;
+        if (c.status === 'PAGO') return false;
+        const vencimento = new Date(c.data_vencimento + 'T00:00:00');
+        return vencimento < hoje;
+    });
+
+    if (vencidosData.length === 0) {
+        showMessage('Não há contas vencidas no momento!', 'error');
+        return;
+    }
+
+    vencidosPage = 1;
+    renderVencidosTable();
+
     const modal = document.getElementById('vencidosModal');
-    
-    if (modalBody && modal) {
-        modalBody.innerHTML = bodyHTML;
+    if (modal) {
         modal.style.display = 'flex';
     }
 };
@@ -541,7 +572,7 @@ window.closeVencidosModal = function() {
 };
 
 // ============================================
-// FORMULÁRIO (com novo campo valor_pago e botões de navegação)
+// FORMULÁRIO (sem alterações, apenas observações)
 // ============================================
 window.toggleForm = function() {
     showFormModal(null);
@@ -979,7 +1010,7 @@ window.viewConta = function(id) {
         </div>
     `).join('');
 
-    // Status formatado igual ao da tabela
+    // Status formatado: se for especial, mostra o tipo; senão, mostra apenas A RECEBER ou PAGO
     let statusDisplay = conta.status;
     if (conta.tipo_nf && conta.tipo_nf !== 'ENVIO') {
         statusDisplay = conta.tipo_nf.replace(/_/g, ' ');
@@ -1124,10 +1155,13 @@ function filterContas() {
 
     let filtered = [...contas];
 
-    filtered = filtered.filter(c => {
-        const data = new Date(c.data_emissao + 'T00:00:00');
-        return data.getMonth() === currentMonth && data.getFullYear() === currentYear;
-    });
+    // Filtro por mês (ou todos)
+    if (!showAllMonths) {
+        filtered = filtered.filter(c => {
+            const data = new Date(c.data_emissao + 'T00:00:00');
+            return data.getMonth() === currentMonth && data.getFullYear() === currentYear;
+        });
+    }
 
     if (filterVendedor) {
         filtered = filtered.filter(c => c.vendedor === filterVendedor);
@@ -1150,17 +1184,28 @@ function filterContas() {
         );
     }
 
-    filtered.sort((a, b) => {
-        const numA = parseInt(a.numero_nf.replace(/\D/g, '')) || 0;
-        const numB = parseInt(b.numero_nf.replace(/\D/g, '')) || 0;
-        return numB - numA;
-    });
+    // Ordenação
+    if (showAllMonths) {
+        // Todos os meses: ordenar por data de emissão crescente (mais antiga primeiro)
+        filtered.sort((a, b) => {
+            const dateA = new Date(a.data_emissao + 'T00:00:00');
+            const dateB = new Date(b.data_emissao + 'T00:00:00');
+            return dateA - dateB;
+        });
+    } else {
+        // Mês específico: ordenar por número NF decrescente (como antes)
+        filtered.sort((a, b) => {
+            const numA = parseInt(a.numero_nf.replace(/\D/g, '')) || 0;
+            const numB = parseInt(b.numero_nf.replace(/\D/g, '')) || 0;
+            return numB - numA;
+        });
+    }
     
     renderContas(filtered);
 }
 
 // ============================================
-// RENDERIZAÇÃO DA TABELA (com nova coluna valor_pago e sem coluna valor)
+// RENDERIZAÇÃO DA TABELA (com coluna Valor NF e sem Vendedor)
 // ============================================
 function renderContas(contasToRender) {
     const container = document.getElementById('contasContainer');
@@ -1180,9 +1225,9 @@ function renderContas(contasToRender) {
                         <th style="text-align: center; width: 60px;"> </th>
                         <th>NF</th>
                         <th>Órgão</th>
-                        <th>Vendedor</th>
                         <th>Banco</th>
                         <th>Pagamento</th>
+                        <th>Valor NF</th>
                         <th>Valor Pago</th>
                         <th>Status</th>
                         <th style="text-align: center; min-width: 260px;">Ações</th>
@@ -1209,9 +1254,9 @@ function renderContas(contasToRender) {
                             </td>
                             <td><strong>${c.numero_nf}</strong></td>
                             <td>${c.orgao}</td>
-                            <td>${c.vendedor}</td>
                             <td>${c.banco}</td>
                             <td>${c.data_pagamento ? formatDate(c.data_pagamento) : '-'}</td>
+                            <td><strong>${formatCurrency(c.valor)}</strong></td>
                             <td><strong>${formatCurrency(c.valor_pago || 0)}</strong></td>
                             <td>
                                 <span class="badge status-${isEspecial ? 'especial' : statusClass}">
@@ -1257,8 +1302,6 @@ window.togglePago = async function(id) {
     // Se for marcar como pago, sugere preencher o valor_pago com o valor total (se estiver vazio)
     let novoValorPago = conta.valor_pago;
     if (novoStatus === 'PAGO' && (conta.valor_pago === 0 || conta.valor_pago === null)) {
-        // Poderia abrir um prompt? Mas para simplificar, definimos como o valor total
-        // O usuário pode ajustar manualmente depois
         novoValorPago = conta.valor;
     }
 
