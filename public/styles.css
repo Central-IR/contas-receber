@@ -58,7 +58,7 @@ body {
     background: var(--bg-secondary);
     color: var(--text-primary);
     line-height: 1.6;
-    overflow-y: auto; /* Permite scroll vertical quando necessário, mas evitamos barras horizontais */
+    overflow-y: auto;
     overflow-x: hidden;
 }
 
@@ -384,6 +384,36 @@ h2 {
     font-weight: 600;
     color: var(--text-primary);
     white-space: nowrap;
+}
+
+/* Botão "Todos os Meses" */
+.month-nav-all {
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 0.35rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-left: 0.25rem;
+    height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.month-nav-all:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.month-nav-all.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
 }
 
 .search-btn {
@@ -1112,7 +1142,7 @@ button.small {
     margin-bottom: 1.5rem;
     overflow-x: auto;
     scrollbar-width: thin;
-    flex-wrap: wrap; /* Permite quebra em telas pequenas */
+    flex-wrap: wrap;
 }
 
 .tab-btn {
@@ -1403,34 +1433,4 @@ button.small {
     .nova-observacao textarea {
         min-height: 100px;
     }
-}
-
-/* Botão "Todos os Meses" */
-.month-nav-all {
-    background: var(--input-bg);
-    border: 1px solid var(--border-color);
-    color: var(--text-primary);
-    padding: 0.35rem 0.75rem;
-    border-radius: 6px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    margin-left: 0.25rem;
-    height: 38px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.month-nav-all:hover {
-    background: var(--primary);
-    color: white;
-    border-color: var(--primary);
-}
-
-.month-nav-all.active {
-    background: var(--primary);
-    color: white;
-    border-color: var(--primary);
 }
