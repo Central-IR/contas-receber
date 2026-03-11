@@ -63,12 +63,10 @@ function renderCalendarMonths() {
 
 // Função para selecionar um mês
 function selectMonth(monthIndex) {
-    // Verifica se as variáveis globais existem
     if (typeof currentMonth !== 'undefined' && typeof currentYear !== 'undefined') {
-        // Desativa o modo "Todos"
         if (typeof showAllMonths !== 'undefined' && showAllMonths) {
             if (typeof toggleAllMonths === 'function') {
-                toggleAllMonths(); // Isso desativará o modo
+                toggleAllMonths(); // Desativa o modo "Todos"
             } else {
                 showAllMonths = false;
             }
@@ -77,41 +75,26 @@ function selectMonth(monthIndex) {
         currentMonth = monthIndex;
         currentYear = calendarYear;
         
-        // Atualiza a interface se as funções existirem
-        if (typeof updateMonthDisplay === 'function') {
-            updateMonthDisplay();
-        }
-        if (typeof filterContas === 'function') {
-            filterContas();
-        }
+        if (typeof updateMonthDisplay === 'function') updateMonthDisplay();
+        if (typeof filterContas === 'function') filterContas();
     }
-    
-    // Fecha o modal
     toggleCalendar();
 }
 
 // Função para selecionar "Todos os Meses"
 function selectAllMonths() {
     if (typeof showAllMonths !== 'undefined') {
-        // Ativa o modo "Todos" se não estiver ativo
         if (!showAllMonths) {
             if (typeof toggleAllMonths === 'function') {
-                toggleAllMonths(); // Isso ativará o modo
+                toggleAllMonths(); // Ativa o modo "Todos"
             } else {
                 showAllMonths = true;
             }
         }
         
-        // Atualiza a interface
-        if (typeof updateMonthDisplay === 'function') {
-            updateMonthDisplay();
-        }
-        if (typeof filterContas === 'function') {
-            filterContas();
-        }
+        if (typeof updateMonthDisplay === 'function') updateMonthDisplay();
+        if (typeof filterContas === 'function') filterContas();
     }
-    
-    // Fecha o modal
     toggleCalendar();
 }
 
