@@ -659,6 +659,7 @@ function showFormModal(editingId = null) {
                                         <option value="REMESSA_AMOSTRA" ${conta?.tipo_nf === 'REMESSA_AMOSTRA' ? 'selected' : ''}>Remessa de Amostra</option>
                                         <option value="SIMPLES_REMESSA" ${conta?.tipo_nf === 'SIMPLES_REMESSA' ? 'selected' : ''}>Simples Remessa</option>
                                         <option value="DEVOLUCAO" ${conta?.tipo_nf === 'DEVOLUCAO' ? 'selected' : ''}>Devolução</option>
+                                        <option value="DEVOLVIDA" ${conta?.tipo_nf === 'DEVOLVIDA' ? 'selected' : ''}>Devolvida</option>
                                     </select>
                                 </div>
                             </div>
@@ -1002,7 +1003,8 @@ window.viewConta = function(id) {
         'CANCELADA': 'Cancelada',
         'REMESSA_AMOSTRA': 'Remessa de Amostra',
         'SIMPLES_REMESSA': 'Simples Remessa',
-        'DEVOLUCAO': 'Devolução'
+        'DEVOLUCAO': 'Devolução',
+        'DEVOLVIDA': 'Devolvida'
     };
 
     const observacoesHTML = (conta.observacoes || []).map(obs => `
@@ -1251,7 +1253,14 @@ function renderContas(contasToRender) {
                         const isEnvio = !c.tipo_nf || c.tipo_nf === 'ENVIO';
                         const isPago = c.status === 'PAGO';
                         const rowClass = isPago ? 'row-pago' : '';
-                        const statusDisplay = isEspecial ? c.tipo_nf.replace(/_/g, ' ') : c.status;
+                        const tipoLabels = {
+                            'CANCELADA': 'Cancelada',
+                            'REMESSA_AMOSTRA': 'Remessa de Amostra',
+                            'SIMPLES_REMESSA': 'Simples Remessa',
+                            'DEVOLUCAO': 'Devolução',
+                            'DEVOLVIDA': 'Devolvida'
+                        };
+                        const statusDisplay = isEspecial ? (tipoLabels[c.tipo_nf] || c.tipo_nf.replace(/_/g, ' ')) : c.status;
                         return `
                         <tr class="${rowClass}" data-id="${c.id}" style="cursor:pointer;">
                             <td style="text-align: center;">
