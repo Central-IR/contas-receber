@@ -749,7 +749,7 @@ function renderContas(lista) {
     if(!lista.length) { container.innerHTML = '<div style="text-align:center; padding:2rem;">Nenhuma conta encontrada</div>'; return; }
     const hoje = new Date(); hoje.setHours(0,0,0,0);
     const tipoLabels = { 'CANCELADA':'Cancelada','REMESSA_AMOSTRA':'Remessa Amostra','SIMPLES_REMESSA':'Simples Remessa','DEVOLUCAO':'Devolução','DEVOLVIDA':'Devolvida' };
-    const html = `
+    let html = `
         <div style="overflow-x:auto;">
             <table style="width:100%">
                 <thead>
@@ -765,41 +765,43 @@ function renderContas(lista) {
                     </tr>
                 </thead>
                 <tbody>
-                    ${lista.map(c => {
-                        const isEnvio = !c.tipo_nf || c.tipo_nf === 'ENVIO';
-                        const isPago = c.status === 'PAGO';
-                        const rowClass = isPago ? 'row-pago' : '';
-                        let statusBadge = '';
-                        if(!isEnvio) {
-                            statusBadge = `<span class="badge status-especial">${tipoLabels[c.tipo_nf] || c.tipo_nf}</span>`;
-                        } else if(isPago) {
-                            statusBadge = `<span class="badge status-pago">PAGO</span>`;
-                        } else {
-                            const vencimento = new Date(c.data_vencimento+'T00:00:00');
-                            if(vencimento < hoje) {
-                                statusBadge = `<span class="badge status-vencido">VENCIDO</span>`;
-                            } else {
-                                statusBadge = `<span class="badge status-a-receber">A RECEBER</span>`;
-                            }
-                        }
-                        return `
-                            <tr class="${rowClass}" data-id="${c.id}" style="cursor:pointer;">
-                                <td style="text-align:center;">
-                                    ${isEnvio ? `<input type="checkbox" class="pago-checkbox" ${isPago ? 'checked' : ''} onchange="togglePagamento('${c.id}', this.checked)">` : '-'}
-                                </td>
-                                <td><strong>${c.numero_nf}</strong></td>
-                                <td>${c.orgao}</td>
-                                <td><strong>${formatCurrency(c.valor)}</strong></td>
-                                <td>${formatCurrency(c.valor_pago||0)}</td>
-                                <td>${c.data_vencimento ? formatDate(c.data_vencimento) : '-'}</td>
-                                <td>${statusBadge}</td>
-                                <td class="actions-cell" style="text-align:center;">
-                                    <button onclick="editConta('${c.id}')" class="action-btn edit">Editar</button>
-                                    <button onclick="deleteConta('${c.id}')" class="action-btn delete">Excluir</button>
-                                </td>
-                            </tr>
-                        `;
-                    }).join('')}
+    `;
+    for(const c of lista) {
+        const isEnvio = !c.tipo_nf || c.tipo_nf === 'ENVIO';
+        const isPago = c.status === 'PAGO';
+        const rowClass = isPago ? 'row-pago' : '';
+        let statusBadge = '';
+        if(!isEnvio) {
+            statusBadge = `<span class="badge status-especial">${tipoLabels[c.tipo_nf] || c.tipo_nf}</span>`;
+        } else if(isPago) {
+            statusBadge = `<span class="badge status-pago">PAGO</span>`;
+        } else {
+            const vencimento = new Date(c.data_vencimento+'T00:00:00');
+            if(vencimento < hoje) {
+                statusBadge = `<span class="badge status-vencido">VENCIDO</span>`;
+            } else {
+                statusBadge = `<span class="badge status-a-receber">A RECEBER</span>`;
+            }
+        }
+        html += `
+            <tr class="${rowClass}" data-id="${c.id}" style="cursor:pointer;">
+                <td style="text-align:center;">
+                    ${isEnvio ? `<input type="checkbox" class="pago-checkbox" ${isPago ? 'checked' : ''} onchange="togglePagamento('${c.id}', this.checked)">` : '-'}
+                </td>
+                <td><strong>${c.numero_nf}</strong></td>
+                <td>${c.orgao}</td>
+                <td><strong>${formatCurrency(c.valor)}</strong></td>
+                <td>${formatCurrency(c.valor_pago||0)}</td>
+                <td>${c.data_vencimento ? formatDate(c.data_vencimento) : '-'}</td>
+                <td>${statusBadge}</td>
+                <td class="actions-cell" style="text-align:center;">
+                    <button onclick="editConta('${c.id}')" class="action-btn edit">Editar</button>
+                    <button onclick="deleteConta('${c.id}')" class="action-btn delete">Excluir</button>
+                </td>
+            </tr>
+        `;
+    }
+    html += `
                 </tbody>
             </table>
         </div>
@@ -900,4 +902,4 @@ function showMessage(msg, type) {
     },3000);
 }
 
-console.log('✅ Script atualizado com checkbox, linha verde, status VENCIDO e remoção da coluna Banco');
+console.log('✅ Script carregado com checkboxes, linha verde, status VENCIDO e remoção da coluna Banco');
